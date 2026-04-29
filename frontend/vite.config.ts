@@ -7,11 +7,19 @@ import { defineConfig } from "vite";
 export default defineConfig({
   server: {
     host: "0.0.0.0",
-    port: 5173,
+    port: 3000,
+    strictPort: true,
     allowedHosts: true,
     hmr: {
       overlay: false,
+      clientPort: 443,
     },
+  },
+  preview: {
+    host: "0.0.0.0",
+    port: 3000,
+    strictPort: true,
+    allowedHosts: true,
   },
   plugins: [react(), tailwindcss()],
   resolve: {
