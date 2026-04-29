@@ -1,0 +1,6 @@
+{
+  "appId": "com.shashki.royal",
+  "appName": "Шашки Рояль",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

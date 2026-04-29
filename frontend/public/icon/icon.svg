@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#3d1a00"/>
+      <stop offset="100%" stop-color="#0d0400"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffd700" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#ffd700" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="crown" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffe066"/>
+      <stop offset="50%" stop-color="#ffd700"/>
+      <stop offset="100%" stop-color="#b8860b"/>
+    </linearGradient>
+    <linearGradient id="piece" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#cc3300"/>
+      <stop offset="100%" stop-color="#7a1a00"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#ffd700" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="80" fill="url(#bg)"/>
+  <!-- Glow -->
+  <ellipse cx="256" cy="200" rx="180" ry="120" fill="url(#glow)"/>
+
+  <!-- Checkerboard pattern (decorative) -->
+  <g opacity="0.12">
+    <rect x="60" y="340" width="48" height="48" fill="#ffd700"/>
+    <rect x="108" y="340" width="48" height="48" fill="transparent"/>
+    <rect x="156" y="340" width="48" height="48" fill="#ffd700"/>
+    <rect x="204" y="340" width="48" height="48" fill="transparent"/>
+    <rect x="252" y="340" width="48" height="48" fill="#ffd700"/>
+    <rect x="300" y="340" width="48" height="48" fill="transparent"/>
+    <rect x="348" y="340" width="48" height="48" fill="#ffd700"/>
+    <rect x="396" y="340" width="48" height="48" fill="transparent"/>
+    <rect x="60" y="388" width="48" height="48" fill="transparent"/>
+    <rect x="108" y="388" width="48" height="48" fill="#ffd700"/>
+    <rect x="156" y="388" width="48" height="48" fill="transparent"/>
+    <rect x="204" y="388" width="48" height="48" fill="#ffd700"/>
+    <rect x="252" y="388" width="48" height="48" fill="transparent"/>
+    <rect x="300" y="388" width="48" height="48" fill="#ffd700"/>
+    <rect x="348" y="388" width="48" height="48" fill="transparent"/>
+    <rect x="396" y="388" width="48" height="48" fill="#ffd700"/>
+  </g>
+
+  <!-- Crown body -->
+  <g filter="url(#shadow)">
+    <!-- Crown base -->
+    <rect x="126" y="270" width="260" height="50" rx="12" fill="url(#crown)"/>
+    <!-- Crown points -->
+    <polygon points="126,270 126,180 176,230 256,150 336,230 386,180 386,270" fill="url(#crown)"/>
+    <!-- Crown gems -->
+    <circle cx="256" cy="165" r="14" fill="#ff3366" opacity="0.9"/>
+    <circle cx="256" cy="165" r="7" fill="#ff99bb"/>
+    <circle cx="148" cy="225" r="9" fill="#7df9ff" opacity="0.9"/>
+    <circle cx="364" cy="225" r="9" fill="#7df9ff" opacity="0.9"/>
+    <!-- Crown sparkles -->
+    <circle cx="256" cy="295" r="5" fill="#ffe066"/>
+    <circle cx="210" cy="295" r="4" fill="#ffe066"/>
+    <circle cx="302" cy="295" r="4" fill="#ffe066"/>
+  </g>
+
+  <!-- Checkers piece below crown -->
+  <circle cx="256" cy="390" r="52" fill="url(#piece)" filter="url(#shadow)"/>
+  <circle cx="256" cy="390" r="44" fill="none" stroke="#ffd70055" stroke-width="3"/>
+  <circle cx="256" cy="390" r="30" fill="#cc330033"/>
+
+  <!-- Shine on piece -->
+  <ellipse cx="242" cy="373" rx="16" ry="10" fill="#ffffff22"/>
+</svg>

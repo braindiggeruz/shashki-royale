@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#3d1a00"/>
+      <stop offset="100%" stop-color="#0d0400"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffd700" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#ffd700" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="crown" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffe066"/>
+      <stop offset="50%" stop-color="#ffd700"/>
+      <stop offset="100%" stop-color="#b8860b"/>
+    </linearGradient>
+    <linearGradient id="piece" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#cc3300"/>
+      <stop offset="100%" stop-color="#7a1a00"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#ffd700" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Full background (maskable requires no transparency) -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <ellipse cx="256" cy="200" rx="160" ry="110" fill="url(#glow)"/>
+
+  <!-- Safe zone content (80% = 51px padding each side, content 256±154) -->
+  <!-- Crown (scaled down / shifted for safe zone) -->
+  <g filter="url(#shadow)">
+    <rect x="166" y="285" width="180" height="38" rx="10" fill="url(#crown)"/>
+    <polygon points="166,285 166,210 206,250 256,175 306,250 346,210 346,285" fill="url(#crown)"/>
+    <!-- Gems -->
+    <circle cx="256" cy="188" r="11" fill="#ff3366" opacity="0.9"/>
+    <circle cx="256" cy="188" r="5" fill="#ff99bb"/>
+    <circle cx="186" cy="240" r="7" fill="#7df9ff" opacity="0.85"/>
+    <circle cx="326" cy="240" r="7" fill="#7df9ff" opacity="0.85"/>
+    <circle cx="256" cy="308" r="4" fill="#ffe066"/>
+    <circle cx="220" cy="308" r="3" fill="#ffe066"/>
+    <circle cx="292" cy="308" r="3" fill="#ffe066"/>
+  </g>
+
+  <!-- Checker piece -->
+  <circle cx="256" cy="390" r="42" fill="url(#piece)" filter="url(#shadow)"/>
+  <circle cx="256" cy="390" r="35" fill="none" stroke="#ffd70055" stroke-width="2.5"/>
+  <circle cx="256" cy="390" r="22" fill="#cc330022"/>
+  <ellipse cx="244" cy="375" rx="12" ry="8" fill="#ffffff20"/>
+</svg>
