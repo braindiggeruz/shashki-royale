@@ -52,7 +52,12 @@ export function extractRoomCode(input: string): string {
   return raw.replace(/[^A-Z0-9]/g, "").slice(0, 6);
 }
 
-export async function createRoom(playerId: string): Promise<GameRow> {
+export type GameMode = "quickplay" | "friend";
+
+export async function createRoom(
+  playerId: string,
+  mode: GameMode = "friend",
+): Promise<GameRow> {
   if (!supabase) throw new Error("Supabase не настроен");
   await setPlayerContext(playerId);
 
@@ -62,21 +67,38 @@ export async function createRoom(playerId: string): Promise<GameRow> {
   // Код короткий и удобный, поэтому на редкий конфликт пробуем создать новый.
   for (let attempt = 0; attempt < 6; attempt++) {
     const code = generateRoomCode();
-    const { data, error } = await supabase
+    const payload: Record<string, unknown> = {
+      room_code: code,
+      status: "waiting",
+      white_player_id: playerId,
+      black_player_id: null,
+      current_turn: "white",
+      board_state: board,
+      move_number: 1,
+      winner: null,
+      resign_reason: null,
+      play_mode: mode,
+    };
+    let { data, error } = await supabase
       .from("games")
-      .insert({
-        room_code: code,
-        status: "waiting",
-        white_player_id: playerId,
-        black_player_id: null,
-        current_turn: "white",
-        board_state: board,
-        move_number: 1,
-        winner: null,
-        resign_reason: null,
-      })
+      .insert(payload)
       .select()
       .single();
+
+    // Backwards-compat: если колонка play_mode ещё не добавлена в БД — повторяем без неё
+    if (
+      error &&
+      (error.message?.toLowerCase().includes("play_mode") ||
+        error.code === "42703" /* undefined_column */ ||
+        error.code === "PGRST204" /* schema cache miss */)
+    ) {
+      delete payload.play_mode;
+      ({ data, error } = await supabase
+        .from("games")
+        .insert(payload)
+        .select()
+        .single());
+    }
 
     if (!error && data) return data as GameRow;
 
@@ -219,7 +241,7 @@ export async function cleanupOldRooms(playerId: string): Promise<void> {
 }
 
 /**
- * Быстрая игра: ищет любую свободную комнату (status=waiting),
+ * Быстрая игра: ищет любую свободную quickplay-комнату (status=waiting, mode=quickplay),
  * где создатель — не текущий игрок.
  * Если находит — присоединяется и возвращает GameRow.
  * Если не находит — возвращает null (значит нужно создать свою).
@@ -240,14 +262,34 @@ export async function findAndJoinRandomRoom(playerId: string): Promise<GameRow |
     .lt("created_at", fiveMinutesAgo)
     ;
 
-  // Ищем самую старую свежую свободную комнату (FIFO — справедливо)
-  const { data: rooms, error: searchErr } = await supabase
-    .from("games")
-    .select("*")
-    .eq("status", "waiting")
-    .neq("white_player_id", playerId)
-    .order("created_at", { ascending: true })
-    .limit(1);
+  // Ищем самую старую свежую свободную quickplay-комнату (FIFO — справедливо).
+  // ВАЖНО: фильтруем по play_mode='quickplay' чтобы не «украсть» friend-комнату,
+  // которая ждёт конкретного игрока по коду.
+  const buildBaseQuery = () =>
+    supabase!
+      .from("games")
+      .select("*")
+      .eq("status", "waiting")
+      .neq("white_player_id", playerId)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+  let { data: rooms, error: searchErr } = await buildBaseQuery().eq(
+    "play_mode",
+    "quickplay",
+  );
+
+  // Backwards-compat: если колонка play_mode не существует — fallback на старое поведение
+  // (берём любую waiting-комнату). После применения SQL-миграции эта ветка не
+  // используется.
+  if (
+    searchErr &&
+    (searchErr.message?.toLowerCase().includes("play_mode") ||
+      searchErr.code === "42703" /* undefined column */ ||
+      searchErr.code === "PGRST204" /* schema cache miss */)
+  ) {
+    ({ data: rooms, error: searchErr } = await buildBaseQuery());
+  }
 
   if (searchErr || !rooms || rooms.length === 0) {
     return null; // Нет свободных комнат

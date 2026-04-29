@@ -9,7 +9,7 @@ import { createRoom, joinRoom, fetchGame, extractRoomCode, findAndJoinRandomRoom
 import PrimaryButton from "../components/PrimaryButton.tsx";
 import { toast } from "sonner";
 
-type LobbyMode = "menu" | "quickplay" | "creating" | "waiting" | "friend_menu" | "joining" | "error";
+type LobbyMode = "menu" | "quickplay" | "quickplay_waiting" | "creating" | "waiting" | "friend_menu" | "joining" | "error";
 
 function isMobileDevice(): boolean {
   if (typeof window === "undefined") return false;
@@ -28,11 +28,23 @@ export default function Lobby() {
   const [copied, setCopied] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
   const [useMobile] = useState(() => isMobileDevice());
+  const [waitElapsed, setWaitElapsed] = useState(0);
 
   const channelRef = useRef<ReturnType<NonNullable<typeof supabase>["channel"]> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const gameIdRef = useRef<string | null>(null);
   const autoJoinStartedRef = useRef(false);
+
+  // Tick elapsed counter for quickplay_waiting and waiting
+  useEffect(() => {
+    if (mode !== "quickplay_waiting" && mode !== "waiting") {
+      setWaitElapsed(0);
+      return;
+    }
+    setWaitElapsed(0);
+    const t = setInterval(() => setWaitElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [mode]);
 
   const cleanup = useCallback(() => {
     if (channelRef.current && supabase) {
@@ -86,11 +98,11 @@ export default function Lobby() {
         return;
       }
 
-      // 2. Не нашли — создаём свою и ждём
-      const game = await createRoom(playerId);
+      // 2. Не нашли — создаём свою quickplay-комнату и ждём
+      const game = await createRoom(playerId, "quickplay");
       gameIdRef.current = game.id;
       setRoomCode(game.room_code);
-      setMode("waiting");
+      setMode("quickplay_waiting");
 
       if (!supabase) return;
 
@@ -143,7 +155,7 @@ export default function Lobby() {
     }
     setMode("creating");
     try {
-      const game = await createRoom(playerId);
+      const game = await createRoom(playerId, "friend");
       gameIdRef.current = game.id;
       setRoomCode(game.room_code);
       setMode("waiting");
@@ -253,8 +265,20 @@ export default function Lobby() {
 
   const goBack = () => {
     cleanup();
+    // Если у нас есть наша waiting-комната — закроем её, чтобы не висеть
+    // в очереди quickplay для других игроков
+    const ourId = gameIdRef.current;
+    if (ourId && supabase) {
+      void supabase
+        .from("games")
+        .update({ status: "finished", resign_reason: "Поиск отменён" })
+        .eq("id", ourId)
+        .eq("status", "waiting");
+    }
+    gameIdRef.current = null;
     setMode("menu");
     setJoinCode("");
+    setRoomCode("");
   };
 
   return (
@@ -323,6 +347,7 @@ export default function Lobby() {
               <motion.button
                 onClick={handleQuickPlay}
                 whileTap={{ scale: 0.97 }}
+                data-testid="lobby-quickplay-btn"
                 className="w-full py-5 rounded-2xl font-bold text-xl flex items-center justify-center gap-3 cursor-pointer"
                 style={{
                   background: "linear-gradient(135deg, #FFD700 0%, #FF8C00 100%)",
@@ -408,6 +433,98 @@ export default function Lobby() {
                 style={{ color: "rgba(212,175,55,0.5)", background: "rgba(255,255,255,0.04)" }}
               >
                 Отмена
+              </button>
+            </motion.div>
+          )}
+
+          {/* ═══════════════ QUICKPLAY WAITING (created own room, listening) ═══════════════ */}
+          {mode === "quickplay_waiting" && (
+            <motion.div
+              key="quickplay_waiting"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-full max-w-sm text-center space-y-6"
+              data-testid="quickplay-waiting"
+            >
+              {/* Pulsing search ring */}
+              <div className="relative w-24 h-24 mx-auto">
+                <motion.div
+                  className="absolute inset-0 rounded-full"
+                  style={{ border: "2px solid rgba(212,175,55,0.35)" }}
+                  animate={{ scale: [1, 1.5], opacity: [0.6, 0] }}
+                  transition={{ repeat: Infinity, duration: 1.6, ease: "easeOut" }}
+                />
+                <motion.div
+                  className="absolute inset-0 rounded-full"
+                  style={{ border: "2px solid rgba(212,175,55,0.35)" }}
+                  animate={{ scale: [1, 1.5], opacity: [0.6, 0] }}
+                  transition={{ repeat: Infinity, duration: 1.6, ease: "easeOut", delay: 0.5 }}
+                />
+                <div
+                  className="absolute inset-2 rounded-full flex items-center justify-center"
+                  style={{
+                    background: "rgba(212,175,55,0.10)",
+                    border: "2px solid rgba(212,175,55,0.5)",
+                  }}
+                >
+                  <Zap className="w-9 h-9" style={{ color: "#FFD700" }} />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p
+                  className="text-xl font-bold"
+                  style={{ color: "#FFD700", fontFamily: "Cinzel, serif" }}
+                  data-testid="quickplay-waiting-title"
+                >
+                  Ищем соперника...
+                </p>
+                <p
+                  className="text-sm tabular-nums"
+                  style={{ color: "rgba(212,175,55,0.6)" }}
+                  data-testid="quickplay-elapsed"
+                >
+                  {waitElapsed} сек
+                </p>
+              </div>
+
+              <div className="flex justify-center gap-1">
+                {[0, 1, 2].map((i) => (
+                  <motion.div
+                    key={i}
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: "#D4AF37" }}
+                    animate={{ scale: [1, 1.5, 1], opacity: [0.4, 1, 0.4] }}
+                    transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.2 }}
+                  />
+                ))}
+              </div>
+
+              <div
+                className="rounded-xl px-4 py-3 text-left"
+                style={{
+                  background: "rgba(212,175,55,0.06)",
+                  border: "1px solid rgba(212,175,55,0.18)",
+                }}
+              >
+                <p className="text-xs leading-relaxed" style={{ color: "rgba(212,175,55,0.75)" }}>
+                  💡 Подскажите другу: пусть тоже нажмёт «Быстрая игра» —
+                  вы автоматически попадёте в одну партию.
+                </p>
+              </div>
+
+              <button
+                onClick={goBack}
+                className="text-sm cursor-pointer py-2 px-6 rounded-lg"
+                style={{
+                  color: "rgba(212,175,55,0.7)",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(212,175,55,0.15)",
+                }}
+                data-testid="quickplay-cancel"
+              >
+                Отменить
               </button>
             </motion.div>
           )}
