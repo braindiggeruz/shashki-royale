@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Шашки Рояль</title>
+    <meta name="description" content="Русские шашки. Играй онлайн против реальных соперников." />
+    <link rel="icon" href="https://hercules-cdn.com/file_1hrIVkfiXNsRFNGzyaK6iffh" />
+
+    <!-- Open Graph (Telegram, Facebook, LinkedIn, WhatsApp) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Шашки Рояль" />
+    <meta property="og:description" content="Русские шашки. Играй онлайн против реальных соперников." />
+    <meta property="og:image" content="https://hercules-cdn.com/file_tttkSMDOknMJoFRCDI9p35zK" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:alt" content="Шашки Рояль — Русские шашки онлайн" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Шашки Рояль" />
+    <meta name="twitter:description" content="Русские шашки. Играй онлайн против реальных соперников." />
+    <meta name="twitter:image" content="https://hercules-cdn.com/file_tttkSMDOknMJoFRCDI9p35zK" />
+
+    <!-- PWA Configuration -->
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#1a0800" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Шашки Рояль" />
+    <link rel="apple-touch-icon" href="/icon/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon/icon-512.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon/icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon/icon-192.png" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+      rel="stylesheet"
+      crossorigin
+    />
+
+    <!-- Detect dark mode preference and set the class before next-themes loads. This avoids a flash of unstyled content (FOUC) when the page loads. -->
+    <script>
+      try {
+        let theme = localStorage.getItem("theme");
+        if (theme === "system" || !theme) {
+          let prefersDark = window.matchMedia(
+            "(prefers-color-scheme: dark)",
+          ).matches;
+          theme = prefersDark ? "dark" : "light";
+        }
+        document.documentElement.classList.add(theme);
+      } catch (e) {}
+    </script>
+
+    <link href="/src/index.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
