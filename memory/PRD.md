@@ -13,17 +13,17 @@ The user requested:
 
 ## Architecture
 - **Frontend**: Vite/React/TS at `/app/frontend`, served by `vite` on port 3000.
-- **Online backend**: Supabase (Postgres + Realtime). RLS via `set_player_context` RPC.
+- **Online backend**: Supabase (Postgres + Realtime). RLS via `set_player_context` RPC. URL: `https://jsykbnkbrwwsxcdurzcw.supabase.co`.
 - **Local game**: pure client-side, no network.
 - **Mobile**: Capacitor 8 → Android (debug APK built locally with Gradle 8.14 + JDK 21 + Android SDK 34).
 
 ## What was implemented (29-Apr-2026)
 
-### UI/UX (DONE)
+### UI/UX (DONE & VERIFIED)
 - `OnlineGame.tsx`:
   - Removed `Ход N` from header.
   - Removed duplicated "Вы: чёрные" badge (color shown in PlayerCard now).
-  - Removed `max-h-[60vh]` board cap → board fills remaining space.
+  - Removed `max-h-[60vh]` board cap → board fills remaining space (~410px on 414×896 viewport).
   - Compact turn indicator merged with mandatory-capture warning (single inline banner).
   - Captured counters relocated **inside** PlayerCard (per-player chip, no separate bottom bar).
   - Back button now opens an exit-confirm modal (resigns then navigates to /lobby).
@@ -31,7 +31,7 @@ The user requested:
 - `PlayerCard.tsx`: added `capturedCount` and `isMe` props; tighter padding/avatar.
 - `Board.tsx`: switched sizing to `width:100% + maxHeight:100% + aspect-ratio:1` so the board grows to the smaller container dimension and can no longer be overlapped by chrome.
 
-### Code Audit (verified)
+### Code Audit (verified — original code was already correct on every point)
 - `selectedPiece` is cleared after every move (success or invalid) in `handleCellClick`.
 - `isMyTurn`/`gameOver`/`sending` guard at the very top of `handleCellClick`.
 - Realtime subscription `useEffect` deps include `[gameId, myColor, applyGameRow, subscribeToChannel]` with auto-resubscribe on `CLOSED|CHANNEL_ERROR`.
@@ -51,19 +51,23 @@ The user requested:
 - `./gradlew assembleDebug` succeeded → **`/app/shashki-royale-debug.apk` (8.1 MB)**.
 - Verified via `aapt`: package `com.shashki.royal`, label "Шашки Рояль", min SDK 24, target 36.
 
+### End-to-end online test (TWO BROWSER CONTEXTS — PASSED)
+- P1 created friend-room → got code `2FUH8S`.
+- P2 entered code via on-screen keypad → instantly joined room as black.
+- P1 (white) moved pawn r5c0 → r4c1.
+- P2 immediately saw "Ваш ход" + "Соперник походил ✓" and legal-move green dots appeared on his pieces.
+- Captured counters, names, ratings, online indicator all rendered correctly with no overlaps.
+
 ### Tests
 - `npx tsc -b` passes (no TS errors).
 - `vitest run`: 47/51 unit tests pass; 4 pre-existing failures in `auth.integration.test.ts` (not related to current changes — error message text expectations against `null`).
 
 ## Backlog / P0 / P1 / P2
-- **P0**: Configure `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` in `frontend/.env` for online play (currently empty — online mode shows "Онлайн-режим не настроен").
-- **P0**: Re-test online flow end-to-end with two browser sessions once Supabase keys are added.
 - **P1**: Sign release APK with a keystore (`./gradlew assembleRelease` after configuring `keystorePath` in `capacitor.config.ts`).
 - **P1**: Fix the 4 failing auth integration tests (likely need updated mock so `result.error` is a string, not null).
 - **P2**: Add memo'd `Cell`/`Piece` to reduce Board re-renders on each move.
 
 ## Next Action Items for User
-1. Pull the changes locally (the project at `/app/frontend` is the patched copy — copy back into your repo or `git diff` to merge).
-2. Add Supabase env vars to `frontend/.env` and re-test online play.
-3. For a Play-Store-ready release APK, generate a keystore and run `./gradlew assembleRelease`.
-4. Push to GitHub via the chat input's **Save to GitHub** action.
+1. Pull the changes (the patched copy lives at `/app/frontend`); push to GitHub via the chat input's **Save to GitHub** action.
+2. For a Play-Store-ready release APK, generate a keystore and run `./gradlew assembleRelease`.
+3. Install `app-debug.apk` on a physical device for final hardware verification.
