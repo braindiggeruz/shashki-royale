@@ -534,7 +534,7 @@ export default function OnlineGame() {
   if (loadError) {
     return (
       <div
-        className="h-full flex flex-col items-center justify-center px-6 gap-5"
+        className="h-[100dvh] flex flex-col items-center justify-center px-6 gap-5"
         style={{ background: "radial-gradient(ellipse at center, #2C1810 0%, #0A0503 100%)" }}
       >
         <AlertCircle className="w-12 h-12 text-red-400" />
@@ -561,7 +561,7 @@ export default function OnlineGame() {
   if (!supabaseConfigured) {
     return (
       <div
-        className="h-full flex flex-col items-center justify-center px-6 gap-5"
+        className="h-[100dvh] flex flex-col items-center justify-center px-6 gap-5"
         style={{ background: "radial-gradient(ellipse at center, #2C1810 0%, #0A0503 100%)" }}
       >
         <AlertCircle className="w-12 h-12 text-red-400" />
@@ -581,7 +581,7 @@ export default function OnlineGame() {
 
   return (
     <div
-      className="h-full flex flex-col overflow-hidden"
+      className="h-[100dvh] flex flex-col overflow-hidden"
       style={{ background: "radial-gradient(ellipse at center, #2C1810 0%, #0A0503 100%)" }}
     >
       {/* Header */}

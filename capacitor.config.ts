@@ -1,20 +1,22 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.shashki.royal',
+  appId: 'com.shashkiroyale.webviewfix',
   appName: 'Шашки Рояль',
   webDir: 'dist',
+  // Load production website directly so users always get the latest deploy.
+  // The cache-busting `?apk_fix=140` proves the WebView is on v1.4.0.
   server: {
-    androidScheme: 'https'
+    url: 'https://shashki-royale.pages.dev/?apk_fix=140',
+    androidScheme: 'https',
+    cleartext: false,
+    allowNavigation: ['shashki-royale.pages.dev', '*.pages.dev', '*.supabase.co']
   },
   android: {
-    buildOptions: {
-      keystorePath: undefined,
-      keystorePassword: undefined,
-      keystoreAlias: undefined,
-      keystoreAliasPassword: undefined,
-      releaseType: 'APK'
-    }
+    allowMixedContent: false,
+    captureInput: true,
+    webContentsDebuggingEnabled: false,
+    backgroundColor: '#1A0800'
   }
 };
 

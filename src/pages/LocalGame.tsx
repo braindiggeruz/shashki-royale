@@ -73,7 +73,8 @@ export default function LocalGame() {
 
   return (
     <div
-      className="h-full flex flex-col overflow-hidden"
+      data-testid="local-game"
+      className="h-[100dvh] flex flex-col overflow-hidden"
       style={{ background: "radial-gradient(ellipse at center, #2C1810 0%, #0A0503 100%)" }}
     >
       {/* Header */}

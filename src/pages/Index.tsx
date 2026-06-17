@@ -57,13 +57,15 @@ export default function Index() {
 
   return (
     <div
-      className="h-full flex flex-col items-center justify-between py-8 px-6 overflow-hidden relative"
+      data-testid="home-screen"
+      className="min-h-[100dvh] flex flex-col items-center gap-4 sm:gap-6 px-5 sm:px-6 safe-pt safe-pb safe-px relative"
       style={{
         background: "radial-gradient(ellipse at center, #2C1810 0%, #0A0503 100%)",
+        paddingTop: "max(env(safe-area-inset-top, 0px), 16px)",
       }}
     >
       {/* Top bar: profile + balance + locale */}
-      <div className="w-full max-w-sm flex items-center justify-between mb-2">
+      <div className="w-full max-w-sm flex items-center justify-between">
         <div className="flex gap-2">
           <button
             onClick={() => navigate("/profile")}
@@ -92,7 +94,7 @@ export default function Index() {
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
-        className="flex flex-col items-center gap-3"
+        className="flex flex-col items-center gap-2 mt-2"
       >
         {/* Royal Crown SVG */}
         <motion.div
@@ -101,7 +103,7 @@ export default function Index() {
           transition={{ delay: 0.3, duration: 0.6 }}
           style={{ filter: "drop-shadow(0 0 20px rgba(212,175,55,0.7))" }}
         >
-          <svg viewBox="0 0 80 52" width="80" height="52">
+          <svg viewBox="0 0 80 52" width="64" height="42" className="sm:w-20 sm:h-[52px]">
             <defs>
               <linearGradient id="crownGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" stopColor="#FFD700" />
@@ -131,7 +133,7 @@ export default function Index() {
 
         <div className="text-center">
           <h1
-            className="text-5xl font-black tracking-widest uppercase leading-none"
+            className="text-4xl sm:text-5xl font-black tracking-widest uppercase leading-none"
             style={{
               fontFamily: "Cinzel, serif",
               background: "linear-gradient(180deg, #FFD700 0%, #B8860B 60%, #FFD700 100%)",
@@ -143,7 +145,7 @@ export default function Index() {
             ШАШКИ
           </h1>
           <h1
-            className="text-5xl font-black tracking-widest uppercase leading-none -mt-1"
+            className="text-4xl sm:text-5xl font-black tracking-widest uppercase leading-none -mt-1"
             style={{
               fontFamily: "Cinzel, serif",
               background: "linear-gradient(180deg, #FFD700 0%, #B8860B 60%, #FFD700 100%)",
@@ -165,10 +167,11 @@ export default function Index() {
 
       {/* Buttons */}
       <motion.div
+        data-testid="home-actions"
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4, duration: 0.7, ease: "easeOut" }}
-        className="w-full max-w-sm flex flex-col gap-3 relative z-10"
+        className="w-full max-w-sm flex flex-col gap-2.5 relative z-10 mt-auto"
       >
         {/* Resume game card */}
         <AnimatePresence>
@@ -256,9 +259,9 @@ export default function Index() {
       </motion.div>
 
       {/* Language switcher + footer */}
-      <div className="flex flex-col items-center gap-2 relative z-10">
+      <div className="flex flex-col items-center gap-1.5 relative z-10 pb-2">
         <LocaleSwitcher compact />
-        <p className="text-xs" style={{ color: "rgba(212,175,55,0.25)" }}>
+        <p className="text-[10px]" style={{ color: "rgba(212,175,55,0.25)" }}>
           © Шашки Рояль 2026
         </p>
       </div>

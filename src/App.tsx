@@ -55,6 +55,7 @@ export default function App() {
   return (
     <DefaultProviders>
       <AppInner />
+      <div id="apk-fix-marker" data-testid="apk-fix-marker">APK FIX v1.4.0</div>
     </DefaultProviders>
   );
 }

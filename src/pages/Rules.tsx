@@ -57,7 +57,7 @@ export default function Rules() {
 
   return (
     <div
-      className="h-full flex flex-col overflow-hidden"
+      className="h-[100dvh] flex flex-col overflow-hidden"
       style={{
         background: "radial-gradient(ellipse at center, #2C1810 0%, #0A0503 100%)",
       }}

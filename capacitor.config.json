@@ -1,6 +1,18 @@
 {
-  "appId": "com.shashki.royal",
+  "appId": "com.shashkiroyale.webviewfix",
   "appName": "Шашки Рояль",
   "webDir": "dist",
-  "bundledWebRuntime": false
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://shashki-royale.pages.dev/?apk_fix=140",
+    "androidScheme": "https",
+    "cleartext": false,
+    "allowNavigation": ["shashki-royale.pages.dev", "*.pages.dev", "*.supabase.co"]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#1A0800"
+  }
 }

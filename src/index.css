@@ -130,10 +130,53 @@
     user-select: none;
     overscroll-behavior: none;
   }
+  /* Allow the app shell to grow to the dynamic viewport (handles Android nav bar
+     and iOS safe-areas) and to scroll when content overflows. Individual game
+     screens opt back into a fixed, non-scrolling layout via the body class
+     `app-no-scroll` (added in LocalGame / OnlineGame). */
   html, body, #root {
-    height: 100%;
+    min-height: 100dvh;
+    min-height: 100svh;
+  }
+  html, body {
+    height: auto;
+  }
+  #root {
+    width: 100%;
+    min-height: 100dvh;
+    min-height: 100svh;
+    -webkit-overflow-scrolling: touch;
+  }
+  body.app-no-scroll, body.app-no-scroll #root {
+    height: 100dvh;
+    height: 100svh;
+    min-height: 100dvh;
+    min-height: 100svh;
     overflow: hidden;
   }
+}
+
+/* Utility: safe-area aware padding for full-screen menus */
+.safe-pt { padding-top: max(env(safe-area-inset-top, 0px), 8px); }
+.safe-pb { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); }
+.safe-px { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+
+/* APK build proof marker (temporary, removed by setting --apk-marker:none) */
+#apk-fix-marker {
+  position: fixed;
+  right: 8px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  font-family: "Montserrat", sans-serif;
+  color: rgba(212,175,55,0.55);
+  background: rgba(26,8,0,0.55);
+  border: 1px solid rgba(212,175,55,0.25);
+  border-radius: 999px;
+  padding: 2px 8px;
+  pointer-events: none;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
 }
 
 @keyframes invalidTapFlash {

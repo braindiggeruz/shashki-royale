@@ -259,7 +259,7 @@ export default function Lobby() {
 
   return (
     <div
-      className="h-full flex flex-col overflow-hidden"
+      className="h-[100dvh] flex flex-col overflow-hidden"
       style={{
         background:
           "radial-gradient(ellipse at 50% 0%, rgba(120, 50, 0, 0.3) 0%, transparent 50%), linear-gradient(180deg, #0d0400 0%, #1a0800 100%)",
