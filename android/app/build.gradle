@@ -10,8 +10,6 @@ android {
         targetSdk 34
         versionCode 143
         versionName '1.4.3'
-        resourceConfigurations += ['ru', 'uz', 'en', 'xxhdpi', 'xhdpi', 'hdpi', 'mdpi', 'xxxhdpi']
-        vectorDrawables.useSupportLibrary = true
     }
 
     signingConfigs {

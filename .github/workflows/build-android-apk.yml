@@ -63,7 +63,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'shashki' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'shashki2026' }}
         run: |
-          $HOME/gradle-8.4/bin/gradle clean assembleRelease assembleDebug --no-daemon --warning-mode=summary
+          $HOME/gradle-8.4/bin/gradle clean assembleRelease assembleDebug --no-daemon --stacktrace --info 2>&1 | tail -200
 
       - name: Stage release artifacts
         run: |
