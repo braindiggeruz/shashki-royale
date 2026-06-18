@@ -1,0 +1,109 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install required SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Decode keystore (from secret if provided, else generate ephemeral)
+        working-directory: android/app
+        run: |
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_B64 }}" ]; then
+            echo "${{ secrets.RELEASE_KEYSTORE_B64 }}" | base64 -d > shashki.keystore
+            echo "Using keystore from secret."
+          else
+            keytool -genkey -v -keystore shashki.keystore \
+              -alias shashki -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass shashki2026 -keypass shashki2026 \
+              -dname "CN=Shashki Royale, OU=Game, O=ShashkiRoyale, L=Tashkent, S=TK, C=UZ"
+            echo "Generated ephemeral keystore (build will be reproducible only within this run)."
+          fi
+          ls -la shashki.keystore
+
+      - name: Make local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+
+      - name: Build release APK
+        working-directory: android
+        env:
+          KEYSTORE_PATH: shashki.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'shashki2026' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'shashki' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'shashki2026' }}
+        run: |
+          gradle assembleRelease assembleDebug --no-daemon
+
+      - name: Rename APKs
+        run: |
+          mkdir -p release
+          cp android/app/build/outputs/apk/release/app-release.apk \
+             release/shashki-royale-v1.4.2-webview.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+             release/shashki-royale-v1.4.2-webview-debug.apk
+          ls -la release/
+
+      - name: Verify APK signature
+        run: |
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort | tail -1)
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs \
+            release/shashki-royale-v1.4.2-webview.apk | head -20
+
+      - name: APK metadata (aapt dump badging)
+        run: |
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort | tail -1)
+          "$BUILD_TOOLS/aapt" dump badging release/shashki-royale-v1.4.2-webview.apk | head -10
+          echo "--- size ---"
+          du -h release/*.apk
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: shashki-royale-v1.4.2-apk
+          path: release/
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.4.2
+          name: Shashki Royale v1.4.2 — Coin/QuickMatch + secure settlement
+          body: |
+            ## Что нового
+            - 🎮 Anonymous bootstrap — нет Google/email login wall
+            - 💰 Welcome bonus 100 Coin
+            - ⚡ QuickStakeBar: 1/5/10/25/50 Coin с автоматическим matchmaking
+            - 🔒 Secure settlement: explicit caller auth, NULL guards, replay protection, 5% commission
+            - 📱 Native Android WebView (NOT TWA), portrait, edge-to-edge, safe-area insets
+            - packageId: `com.shashkiroyale.webviewfinal`, versionCode 142
+            - Site: https://shashki-royale.pages.dev/?apk=142
+          files: |
+            release/shashki-royale-v1.4.2-webview.apk
+            release/shashki-royale-v1.4.2-webview-debug.apk
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
