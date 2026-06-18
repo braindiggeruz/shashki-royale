@@ -4,29 +4,42 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Background circle (centered, safe area) -->
+    <!-- Centered safe area is 72x72 within 108x108. -->
     <path
-        android:pathData="M54,54 m-30,0 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0"
-        android:fillColor="#2C1810" />
-    <!-- Crown body -->
-    <path
-        android:pathData="M34,68 L40,42 L48,54 L54,32 L60,54 L68,42 L74,68 Z"
+        android:pathData="M30,72 L36,30 L48,50 L54,15 L60,50 L72,30 L78,72 Z"
         android:fillColor="#FFD700"
         android:strokeColor="#B8860B"
-        android:strokeWidth="0.5"/>
+        android:strokeWidth="1"/>
     <path
-        android:pathData="M34,66 L74,66 L74,76 L34,76 Z"
+        android:pathData="M30,68 L78,68 L78,82 L30,82 Z"
         android:fillColor="#FFD700"
         android:strokeColor="#B8860B"
-        android:strokeWidth="0.5"/>
-    <!-- Jewels -->
+        android:strokeWidth="1"/>
+    <!-- Centre ruby on the top point. -->
     <path
-        android:pathData="M54,34 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"
-        android:fillColor="#DC143C"/>
+        android:pathData="M54,17 m-3.5,0 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0"
+        android:fillColor="#DC143C"
+        android:strokeColor="#FFD700"
+        android:strokeWidth="0.6"/>
+    <!-- Side rubies -->
     <path
-        android:pathData="M40,44 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"
-        android:fillColor="#DC143C"/>
+        android:pathData="M36,32 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#DC143C"
+        android:strokeColor="#FFD700"
+        android:strokeWidth="0.6"/>
     <path
-        android:pathData="M68,44 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"
+        android:pathData="M72,32 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#DC143C"
+        android:strokeColor="#FFD700"
+        android:strokeWidth="0.6"/>
+    <!-- Base accents -->
+    <path
+        android:pathData="M44,75 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"
+        android:fillColor="#FFD700"/>
+    <path
+        android:pathData="M64,75 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"
+        android:fillColor="#FFD700"/>
+    <path
+        android:pathData="M54,75 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
         android:fillColor="#DC143C"/>
 </vector>

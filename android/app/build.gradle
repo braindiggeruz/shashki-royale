@@ -1,15 +1,17 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace 'com.shashkiroyale.webviewfinal'
+    namespace 'com.shashkiroyale.app'
     compileSdk 34
 
     defaultConfig {
-        applicationId 'com.shashkiroyale.webviewfinal'
+        applicationId 'com.shashkiroyale.app'
         minSdk 21
         targetSdk 34
-        versionCode 142
-        versionName '1.4.2'
+        versionCode 143
+        versionName '1.4.3'
+        resourceConfigurations += ['ru', 'uz', 'en', 'xxhdpi', 'xhdpi', 'hdpi', 'mdpi', 'xxxhdpi']
+        vectorDrawables.useSupportLibrary = true
     }
 
     signingConfigs {
@@ -19,16 +21,25 @@ android {
             storePassword System.getenv('KEYSTORE_PASSWORD') ?: 'shashki2026'
             keyAlias System.getenv('KEY_ALIAS') ?: 'shashki'
             keyPassword System.getenv('KEY_PASSWORD') ?: 'shashki2026'
+            v1SigningEnabled true
+            v2SigningEnabled true
+            // v3 signing is preferred on API 28+ devices
+            // (apksigner adds v3 automatically when key supports it)
         }
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled false      // keep readable stacktraces; APK still ~1.5–2.5 MB
+            shrinkResources false
+            debuggable false
             signingConfig signingConfigs.release
         }
         debug {
-            signingConfig signingConfigs.release
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+            debuggable true
+            signingConfig signingConfigs.release  // same key so installable side-by-side
         }
     }
 
@@ -36,9 +47,23 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    splits {
+        abi { enable false }
+        density { enable false }
+    }
+
+    packaging {
+        resources {
+            excludes += ['/META-INF/{AL2.0,LGPL2.1}', '/META-INF/DEPENDENCIES']
+        }
+    }
 }
 
 dependencies {
-    // Use only AndroidX core — no appcompat to avoid AAR resource conflicts.
-    // We use plain android.app.Activity below (no AppCompat theming).
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.webkit:webkit:1.10.0'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation 'com.google.android.material:material:1.11.0'
 }

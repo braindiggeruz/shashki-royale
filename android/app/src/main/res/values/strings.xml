@@ -1,4 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Шашки Рояль</string>
+    <string name="offline_title">Нет интернета</string>
+    <string name="offline_desc">Не удалось загрузить игру.\nПроверьте ваше подключение к интернету и попробуйте снова.</string>
+    <string name="retry">Повторить</string>
 </resources>

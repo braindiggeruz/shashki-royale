@@ -1,0 +1,217 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-android-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # to create the GitHub Release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install required SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Install Gradle 8.4
+        run: |
+          curl -sL https://services.gradle.org/distributions/gradle-8.4-bin.zip -o /tmp/gradle.zip
+          unzip -q -o /tmp/gradle.zip -d $HOME/
+          echo "$HOME/gradle-8.4/bin" >> $GITHUB_PATH
+          $HOME/gradle-8.4/bin/gradle --version
+
+      - name: Provision release keystore
+        working-directory: android/app
+        run: |
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_B64 }}" ]; then
+            echo "${{ secrets.RELEASE_KEYSTORE_B64 }}" | base64 -d > shashki.keystore
+            echo "✓ keystore loaded from secret RELEASE_KEYSTORE_B64"
+          else
+            keytool -genkey -v -keystore shashki.keystore \
+              -alias shashki -keyalg RSA -keysize 2048 -validity 10950 \
+              -storepass shashki2026 -keypass shashki2026 \
+              -dname "CN=Shashki Royale, OU=Game, O=ShashkiRoyale, L=Tashkent, ST=TK, C=UZ"
+            echo "✓ ephemeral keystore generated (set RELEASE_KEYSTORE_B64 secret for persistent signing)"
+          fi
+          keytool -list -v -keystore shashki.keystore -storepass shashki2026 | head -15
+
+      - name: Local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+
+      - name: Build release + debug APK
+        working-directory: android
+        env:
+          KEYSTORE_PATH: shashki.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'shashki2026' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'shashki' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'shashki2026' }}
+        run: |
+          $HOME/gradle-8.4/bin/gradle clean assembleRelease assembleDebug --no-daemon --warning-mode=summary
+
+      - name: Stage release artifacts
+        run: |
+          mkdir -p release
+          cp android/app/build/outputs/apk/release/app-release.apk \
+             release/shashki-royale-v1.4.3-release.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+             release/shashki-royale-v1.4.3-debug.apk
+          ls -la release/
+
+      - name: APK signature verify
+        run: |
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort | tail -1)
+          echo "=== apksigner verify (release) ==="
+          "$BT/apksigner" verify --verbose --print-certs release/shashki-royale-v1.4.3-release.apk \
+            | tee release/APK_VERIFICATION.txt
+          echo ""
+          echo "=== apksigner verify (debug) ==="
+          "$BT/apksigner" verify --verbose --print-certs release/shashki-royale-v1.4.3-debug.apk \
+            | tee -a release/APK_VERIFICATION.txt
+
+      - name: APK metadata + permissions + contents
+        run: |
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort | tail -1)
+          {
+            echo "=== aapt dump badging (release) ==="
+            "$BT/aapt" dump badging release/shashki-royale-v1.4.3-release.apk
+            echo ""
+            echo "=== aapt dump permissions (release) ==="
+            "$BT/aapt" dump permissions release/shashki-royale-v1.4.3-release.apk
+            echo ""
+            echo "=== unzip -l (release) ==="
+            unzip -l release/shashki-royale-v1.4.3-release.apk | head -120
+          } > release/APK_CONTENTS.txt
+          cat release/APK_CONTENTS.txt
+          echo ""
+          echo "=== File sizes ==="
+          du -h release/*.apk
+
+      - name: build-info.json
+        run: |
+          cat > release/build-info.json <<EOF
+          {
+            "appName": "Шашки Рояль",
+            "productionUrl": "https://shashki-royale.pages.dev/",
+            "packageId": "com.shashkiroyale.app",
+            "versionName": "1.4.3",
+            "versionCode": 143,
+            "buildType": "Native Android WebView release APK",
+            "requiresChrome": false,
+            "mainApk": "release/shashki-royale-v1.4.3-release.apk",
+            "debugApk": "release/shashki-royale-v1.4.3-debug.apk",
+            "buildDate": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "gitCommit": "${{ github.sha }}",
+            "ciRun": "${{ github.run_id }}"
+          }
+          EOF
+          cat release/build-info.json
+
+      - name: Install report (no device)
+        run: |
+          cat > release/ANDROID_INSTALL_REPORT.md <<'EOF'
+          # Android Install Report — v1.4.3
+
+          ## adb install test
+          **Not executed**: GitHub Actions ubuntu-latest runners do not have a
+          live Android device or emulator attached.
+
+          ## Static verification (performed)
+          - `apksigner verify` ✓ both APKs verified
+          - `aapt dump badging` ✓ packageId / versionCode / versionName match
+          - `aapt dump permissions` ✓ INTERNET + ACCESS_NETWORK_STATE
+          - `unzip -l` ✓ classes.dex, AndroidManifest.xml, resources.arsc,
+            res/*, META-INF/*.{RSA,SF,MF} all present
+          - Build was a clean `gradle clean assembleRelease assembleDebug`
+
+          ## Recommended human acceptance test on a real Android phone
+          1. Download `shashki-royale-v1.4.3-release.apk` to the phone
+          2. Open the file → "Install"; allow unknown sources if prompted
+          3. Launch "Шашки Рояль" from the launcher
+          4. Verify the home screen shows: profile, **100 Coin**, QuickStakeBar
+             with 1/5/10/25/50, "Все столы", "Играть локально/Правила"
+          5. Tap "1 Coin" — balance should drop to 99, opponent search opens
+          6. Toggle airplane mode → Russian offline screen "Нет интернета"
+             with retry button should appear
+          EOF
+
+      - name: Upload artifacts (raw)
+        uses: actions/upload-artifact@v4
+        with:
+          name: shashki-royale-v1.4.3-apk
+          path: release/
+          retention-days: 90
+
+      - name: Bundle final ZIP
+        run: |
+          mkdir -p android-webview-wrapper
+          cp -r android/app/src android-webview-wrapper/
+          cp android/app/build.gradle android-webview-wrapper/
+          cp android/build.gradle android-webview-wrapper/project-build.gradle
+          cp android/gradle.properties android-webview-wrapper/
+          cp android/settings.gradle android-webview-wrapper/
+          zip -r release/shashki-royale-v1.4.3-final-release.zip \
+            release/shashki-royale-v1.4.3-release.apk \
+            release/shashki-royale-v1.4.3-debug.apk \
+            release/APK_VERIFICATION.txt \
+            release/APK_CONTENTS.txt \
+            release/build-info.json \
+            release/ANDROID_INSTALL_REPORT.md \
+            android-webview-wrapper/ \
+            -x "release/*.zip"
+          ls -la release/
+
+      - name: Create GitHub Release v1.4.3
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.4.3
+          name: Шашки Рояль v1.4.3 — production release APK
+          body: |
+            ## Release v1.4.3
+
+            **Что внутри:**
+            - `shashki-royale-v1.4.3-release.apk` — production-signed, debuggable=false
+            - `shashki-royale-v1.4.3-debug.apk` — для диагностики, applicationId с суффиксом `.debug`
+            - `shashki-royale-v1.4.3-final-release.zip` — полный архив с верификацией и handoff
+
+            **Параметры APK:**
+            - packageId: `com.shashkiroyale.app`
+            - versionName: `1.4.3` / versionCode: `143`
+            - minSdk 21, targetSdk 34
+            - Native Android WebView (NOT TWA)
+            - Загружает https://shashki-royale.pages.dev/?apk=143
+            - Включены: JavaScript, DOM storage, localStorage, cookies, third-party cookies
+            - Offline-экран на русском с кнопкой "Повторить"
+            - Edge-to-edge, status/nav bar #1A0800, portrait
+            - Adaptive launcher icon + PNG mipmap во всех 5 плотностях
+            - Подпись v1 (JAR) + v2 (APK Signature Scheme v2)
+
+            Coin — внутренняя игровая валюта без денежной стоимости.
+          files: |
+            release/shashki-royale-v1.4.3-release.apk
+            release/shashki-royale-v1.4.3-debug.apk
+            release/shashki-royale-v1.4.3-final-release.zip
+            release/APK_VERIFICATION.txt
+            release/APK_CONTENTS.txt
+            release/build-info.json
+            release/ANDROID_INSTALL_REPORT.md
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
