@@ -1,7 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Splash background. Must be a drawable that the system can inflate as a
+  window background BEFORE the application code runs.
+
+  IMPORTANT: do NOT use <bitmap android:src="@mipmap/ic_launcher" /> here:
+  on API 26+ @mipmap/ic_launcher resolves to an <adaptive-icon> XML (not a
+  real bitmap) and BitmapDrawable.inflate() throws an InflateException,
+  crashing the activity before onCreate is called.
+-->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/brand_background" />
-    <item android:gravity="center">
-        <bitmap android:src="@mipmap/ic_launcher" android:gravity="center" />
-    </item>
+    <item android:gravity="center"
+          android:width="160dp"
+          android:height="160dp"
+          android:drawable="@drawable/ic_launcher_foreground" />
 </layer-list>

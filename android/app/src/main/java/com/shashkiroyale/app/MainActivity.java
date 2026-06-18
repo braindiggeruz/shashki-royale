@@ -43,15 +43,18 @@ public class MainActivity extends AppCompatActivity {
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Switch from the splash theme to the runtime theme BEFORE super.onCreate
+        // so the Activity uses Theme.ShashkiRoyale (no special window bg) and we
+        // never have to re-inflate the splash drawable.
+        setTheme(R.style.Theme_ShashkiRoyale);
         super.onCreate(savedInstanceState);
 
-        // Apply the actual app theme after the splash theme has shown.
-        setTheme(R.style.Theme_ShashkiRoyale);
-
         // Edge-to-edge
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        getWindow().setStatusBarColor(Color.parseColor("#1A0800"));
-        getWindow().setNavigationBarColor(Color.parseColor("#1A0800"));
+        try {
+            WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+            getWindow().setStatusBarColor(Color.parseColor("#1A0800"));
+            getWindow().setNavigationBarColor(Color.parseColor("#1A0800"));
+        } catch (Throwable ignored) {}
 
         setContentView(R.layout.activity_main);
 
