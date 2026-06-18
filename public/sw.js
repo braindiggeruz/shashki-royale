@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1.2.0';
+const CACHE_VERSION = 'v1.4.1';
 const CACHE_NAME = `shashki-royale-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
