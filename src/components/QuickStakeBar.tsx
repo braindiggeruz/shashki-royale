@@ -6,7 +6,7 @@ import { Zap } from "lucide-react";
 import { toast } from "sonner";
 import { useProfile } from "../hooks/use-profile";
 import { usePlayerId } from "../hooks/usePlayerId";
-import { fetchStakeTables, createStakeGame, joinStakeGame } from "../services/stakes";
+import { fetchStakeTables, createStakeGame, joinStakeGame, cancelStakeGame } from "../services/stakes";
 import { saveActiveGame } from "../lib/storage";
 import { createInitialBoard } from "../game/initialBoard";
 import { supabaseConfigured } from "../lib/supabase";
@@ -51,14 +51,32 @@ function GoldCoin({ size = 16 }: { size?: number }) {
   );
 }
 
+type StakeRow = { entry_fee: number; pot_amount: number; escrow_status: string };
 type StakeTable = {
   id: string;
   room_code: string;
   status: string;
   match_type: string;
-  white_profile_id: string | null;
-  game_stakes: { entry_fee: number; pot_amount: number; escrow_status: string }[] | null;
+  white_player_id?: string | null;
+  white_profile_id?: string | null;
+  // Supabase PostgREST returns this as an OBJECT (1:1 via UNIQUE FK), not an
+  // array. We must accept both shapes to be safe across PostgREST versions
+  // and across changes in the foreign-key cardinality.
+  game_stakes: StakeRow | StakeRow[] | null;
 };
+
+/**
+ * Normalise the polymorphic `game_stakes` return shape from PostgREST.
+ * - 1:1 relation (UNIQUE FK) → returned as a single object
+ * - 1:N relation             → returned as an array
+ * In our schema game_stakes.game_id is UNIQUE so it should always be an
+ * object, but we defend against the array form too.
+ */
+function pickStake(raw: StakeRow | StakeRow[] | null | undefined): StakeRow | null {
+  if (!raw) return null;
+  if (Array.isArray(raw)) return raw[0] ?? null;
+  return raw;
+}
 
 export default function QuickStakeBar() {
   const navigate = useNavigate();
@@ -97,10 +115,62 @@ export default function QuickStakeBar() {
     setBusyStake(stake);
     try {
       const tables = (await fetchStakeTables()) as unknown as StakeTable[];
+
+      // ─────────────────────────────────────────────────────────────────────
+      // PHASE 1: Detect "stale" matchmaking tables the current user owns
+      // (status='waiting', no opponent). These can pile up if the user
+      // closed the app mid-search. They keep Coin locked on the wallet and
+      // pollute the lobby, so we transparently cancel them here. If one of
+      // those stale tables happens to match the requested stake, we re-use
+      // it instead of cancelling+re-creating.
+      // ─────────────────────────────────────────────────────────────────────
+      const myStaleTables = tables.filter((tbl) => {
+        const isMine =
+          (tbl.white_player_id != null && tbl.white_player_id === playerId) ||
+          (tbl.white_profile_id != null && profile?.id != null && tbl.white_profile_id === profile.id);
+        return isMine && tbl.status === "waiting";
+      });
+
+      const reusableSelf = myStaleTables.find(
+        (tbl) => Number(pickStake(tbl.game_stakes)?.entry_fee ?? 0) === Number(stake),
+      );
+
+      if (reusableSelf) {
+        // Already searching for this exact stake — just navigate to the
+        // existing waiting room instead of creating a duplicate.
+        saveActiveGame({
+          gameId: reusableSelf.id,
+          roomCode: reusableSelf.room_code,
+          playerId,
+          playerColor: "white",
+          savedAt: Date.now(),
+        });
+        navigate("/online-game", { state: { gameId: reusableSelf.id, myColor: "white", stake } });
+        return;
+      }
+
+      for (const stale of myStaleTables) {
+        try {
+          await cancelStakeGame(playerId, stale.id);
+        } catch (e) {
+          // Non-fatal: if we fail to cancel a stale table the player simply
+          // sees it later in the lobby and can cancel manually.
+          console.warn("[QuickMatch] failed to cancel stale table", stale.id, e);
+        }
+      }
+      // Refresh balance so the matchmaker sees the refunded coins right away.
+      await refreshProfile().catch(() => {});
+
+      // ─────────────────────────────────────────────────────────────────────
+      // PHASE 2: Look for any OTHER player's waiting table at this stake.
+      // ─────────────────────────────────────────────────────────────────────
       const candidate = tables.find((tbl) => {
-        const fee = tbl.game_stakes?.[0]?.entry_fee ?? 0;
-        const isMine = profile?.id && tbl.white_profile_id === profile.id;
-        return fee === stake && tbl.status === "waiting" && !isMine;
+        const stakeRow = pickStake(tbl.game_stakes);
+        const fee = Number(stakeRow?.entry_fee ?? 0);
+        const isMine =
+          (tbl.white_player_id != null && tbl.white_player_id === playerId) ||
+          (tbl.white_profile_id != null && profile?.id != null && tbl.white_profile_id === profile.id);
+        return fee === Number(stake) && tbl.status === "waiting" && !isMine;
       });
 
       if (candidate) {

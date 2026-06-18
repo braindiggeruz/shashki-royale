@@ -27,13 +27,16 @@ function generateRoomCode(): string {
   return code;
 }
 
+type StakeRow = { entry_fee: number; pot_amount: number; escrow_status: string };
 type StakeTable = {
   id: string;
   room_code: string;
   status: string;
   match_type: string;
   white_profile_id: string | null;
-  game_stakes: { entry_fee: number; pot_amount: number; escrow_status: string }[] | null;
+  // PostgREST returns this as an OBJECT for 1:1 FKs (UNIQUE game_id) but
+  // some clients/versions return an array. Accept both.
+  game_stakes: StakeRow | StakeRow[] | null;
   white_profile:
     | { id: string; nickname: string; avatar_index: number; rating: number }
     | { id: string; nickname: string; avatar_index: number; rating: number }[]
@@ -43,6 +46,11 @@ type StakeTable = {
 function getCreator(
   raw: StakeTable["white_profile"],
 ): { id: string; nickname: string; avatar_index: number; rating: number } | null {
+  if (!raw) return null;
+  return Array.isArray(raw) ? (raw[0] ?? null) : raw;
+}
+
+function getStake(raw: StakeTable["game_stakes"]): StakeRow | null {
   if (!raw) return null;
   return Array.isArray(raw) ? (raw[0] ?? null) : raw;
 }
@@ -138,7 +146,7 @@ export default function StakeLobbyPage() {
       toast.error("Профиль не загружен");
       return;
     }
-    const fee = table.game_stakes?.[0]?.entry_fee ?? 0;
+    const fee = getStake(table.game_stakes)?.entry_fee ?? 0;
     if ((wallet?.crypto_balance ?? 0) < fee) {
       toast.error("❌ Недостаточно жетонов. Пополните баланс!", {
         style: {
@@ -183,7 +191,7 @@ export default function StakeLobbyPage() {
   const filtered = tables.filter((tbl) => {
     if (filter === "all") return true;
     if (filter === "mine") return tbl.white_profile_id === profile?.id;
-    const fee = tbl.game_stakes?.[0]?.entry_fee ?? 0;
+    const fee = getStake(tbl.game_stakes)?.entry_fee ?? 0;
     if (filter === "beginner") return fee <= 5;
     if (filter === "master") return fee > 5;
     return true;
@@ -314,8 +322,8 @@ export default function StakeLobbyPage() {
         ) : (
           <div className="space-y-3">
             {filtered.map((table, i) => {
-              const fee = table.game_stakes?.[0]?.entry_fee ?? 0;
-              const pot = table.game_stakes?.[0]?.pot_amount ?? fee * 2;
+              const fee = getStake(table.game_stakes)?.entry_fee ?? 0;
+              const pot = getStake(table.game_stakes)?.pot_amount ?? fee * 2;
               const creator = getCreator(table.white_profile);
               const isJoining = joiningId === table.id;
               const canAfford = (wallet?.crypto_balance ?? 0) >= fee;
