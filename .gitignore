@@ -30,7 +30,11 @@ tsconfig.tsbuildinfo
 .env*
 
 # Android/Capacitor — не коммитить APK и keystore
-android/
+android/.gradle/
+android/app/build/
+android/build/
+android/app/*.apk
+android/local.properties
 ios/
 *.apk
 *.aab

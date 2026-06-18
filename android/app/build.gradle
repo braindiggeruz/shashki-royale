@@ -1,0 +1,52 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'com.shashkiroyale.webviewfinal'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.shashkiroyale.webviewfinal'
+        minSdk 21
+        targetSdk 34
+        versionCode 142
+        versionName '1.4.2'
+    }
+
+    signingConfigs {
+        release {
+            def ksPath = System.getenv('KEYSTORE_PATH') ?: 'shashki.keystore'
+            storeFile file(ksPath)
+            storePassword System.getenv('KEYSTORE_PASSWORD') ?: 'shashki2026'
+            keyAlias System.getenv('KEY_ALIAS') ?: 'shashki'
+            keyPassword System.getenv('KEY_PASSWORD') ?: 'shashki2026'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+        debug {
+            // Use the same signing config so debug APK is testable side-by-side
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // Force universal APK output (not AAB)
+    splits {
+        abi { enable false }
+        density { enable false }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.core:core:1.12.0'
+    implementation 'androidx.webkit:webkit:1.10.0'
+}
