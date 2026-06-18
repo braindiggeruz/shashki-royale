@@ -1,0 +1,24 @@
+{
+  "name": "Шашки Рояль",
+  "version": "1.4.2",
+  "versionCode": 142,
+  "packageId": "com.shashkiroyale.webviewfinal",
+  "productionUrl": "https://shashki-royale.pages.dev/",
+  "apkUrl": "https://shashki-royale.pages.dev/?apk=142",
+  "supabaseProject": "jsykbnkbrwwsxcdurzcw",
+  "cloudflareProject": "shashki-royale",
+  "buildDate": "2026-06-18",
+  "gitCommit": "see git rev-parse HEAD",
+  "signing": {
+    "schemes": ["v1", "v2"],
+    "keystoreAlias": "shashki",
+    "certificateDN": "CN=Shashki Royale, OU=Game, O=ShashkiRoyale, L=Tashkent, ST=TK, C=UZ"
+  },
+  "changes": [
+    "Anonymous bootstrap with 100 Coin welcome bonus",
+    "QuickStakeBar restored on home screen (1/5/10/25/50 Coin)",
+    "Settlement RPC hardened with explicit caller param + NULL guards",
+    "Removed Google/email login wall from primary user path",
+    "Mobile layout: safe-area insets, no horizontal scroll, no clipping under nav bar"
+  ]
+}

@@ -1,0 +1,49 @@
+APK Verification Report — Шашки Рояль v1.4.2
+=============================================
+
+release APK: shashki-royale-v1.4.2-webview.apk
+debug   APK: shashki-royale-v1.4.2-webview-debug.apk
+
+Apksigner output (release):
+  Verifies
+  Verified using v1 scheme (JAR signing):       true
+  Verified using v2 scheme (APK Signature v2):  true
+  Verified using v3 scheme:                     false  (not required)
+  Verified using v3.1 scheme:                   false  (not required)
+  Verified for SourceStamp:                     false  (not required)
+  Number of signers:                            1
+
+  V2 Signer: certificate DN: CN=Shashki Royale, OU=Game, O=ShashkiRoyale,
+             L=Tashkent, ST=TK, C=UZ
+  V2 Signer: certificate SHA-256 digest:
+             17219aa26d2d2f750fb5b660ca47cf7a3337b58174f56efdf1676c85f9f02d14
+  V2 Signer: certificate SHA-1 digest:
+             f18f60d19d5bd17e41f5003a7883a34962ec6df8
+  V2 Signer: certificate MD5 digest:
+             95f4497a183d98c28d9c9a47b29edc4b
+  V2 Signer: key algorithm: RSA
+  V2 Signer: key size (bits): 2048
+  V2 Signer: public key SHA-256:
+             edb78b200a21ec61c6474a15cc700d4b3f17d7b93d863f16335f79cc231e1ef3
+
+APK contents (release):
+  META-INF/com/android/build/gradle/app-metadata.properties
+  classes.dex                     5948 bytes
+  AndroidManifest.xml             2860 bytes
+  resources.arsc                  1344 bytes
+  res/0K.xml ... res/RN.xml       (vector launcher + adaptive)
+  META-INF/CERT.SF / CERT.RSA / MANIFEST.MF (v1+v2 signatures)
+
+Manifest highlights:
+  package         = com.shashkiroyale.webviewfinal
+  versionCode     = 142
+  versionName     = 1.4.2
+  minSdkVersion   = 21
+  targetSdkVersion= 34
+  application/screenOrientation=portrait
+  uses-permission android.permission.INTERNET
+  uses-permission android.permission.ACCESS_NETWORK_STATE
+
+Is TWA? NO. Native android.app.Activity + WebView (no androidx.browser).
+Is stub? NO. Real WebView wrapper loading https://shashki-royale.pages.dev/?apk=142.
+Is universal APK (not AAB)? YES (splits.abi=false, splits.density=false).
