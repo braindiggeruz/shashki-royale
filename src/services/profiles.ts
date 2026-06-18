@@ -28,24 +28,18 @@ export type WalletTransaction = {
   id: string;
   profile_id: string;
   game_id: string | null;
-  type: "deposit" | "withdrawal" | "fee_lock" | "fee_refund" | "prize_payout" | "starting_bonus";
+  type:
+    | "deposit"
+    | "withdrawal"
+    | "fee_lock"
+    | "fee_refund"
+    | "prize_payout"
+    | "starting_bonus"
+    | "loss";
   amount: number;
   status: "pending" | "completed" | "failed";
   note: string | null;
   created_at: string;
-};
-
-export type GameStake = {
-  id: string;
-  game_id: string;
-  entry_fee: number;
-  pot_amount: number;
-  white_profile_id: string | null;
-  black_profile_id: string | null;
-  escrow_status: "waiting" | "locked" | "paid" | "refunded";
-  payout_status: "pending" | "paid" | "failed" | "refunded";
-  created_at: string;
-  updated_at: string;
 };
 
 export type ProfileWithWallet = {
@@ -56,7 +50,6 @@ export type ProfileWithWallet = {
 /** Получить или создать профиль (и кошелёк) для анонимного player_id */
 export async function getOrCreateProfile(playerId: string): Promise<ProfileWithWallet> {
   if (!supabase) throw new Error("Supabase не настроен");
-  // Устанавливаем контекст для RLS политик
   await setPlayerContext(playerId);
   const { data, error } = await supabase.rpc("get_or_create_profile", {
     p_player_id: playerId,
@@ -114,7 +107,6 @@ export async function fetchTransactions(
   playerId: string,
 ): Promise<WalletTransaction[]> {
   if (!supabase) return [];
-  // Устанавливаем контекст — только владелец видит свои транзакции
   await setPlayerContext(playerId);
   const { data, error } = await supabase
     .from("wallet_transactions")
@@ -132,10 +124,11 @@ export async function fetchTransactions(
 /** Получить топ-100 лидерборда (публичные данные, без player_id) */
 export async function fetchLeaderboard(): Promise<Omit<Profile, "player_id">[]> {
   if (!supabase) return [];
-  // Используем безопасное представление public_profiles (без player_id)
   const { data, error } = await supabase
     .from("public_profiles")
-    .select("id, nickname, avatar_index, rating, total_games, wins, losses, draws, created_at, last_seen_at")
+    .select(
+      "id, nickname, avatar_index, rating, total_games, wins, losses, draws, created_at, last_seen_at",
+    )
     .order("rating", { ascending: false })
     .limit(100);
   if (error) {
@@ -145,68 +138,22 @@ export async function fetchLeaderboard(): Promise<Omit<Profile, "player_id">[]> 
   return (data ?? []) as Omit<Profile, "player_id">[];
 }
 
-/** Получить активные столы со ставками для лобби */
-export async function fetchStakeTables() {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("games")
-    .select(`
-      id, room_code, status, match_type, white_profile_id,
-      game_stakes(entry_fee, pot_amount, escrow_status),
-      white_profile:profiles!games_white_profile_id_fkey(nickname, avatar_index, rating)
-    `)
-    .eq("match_type", "stake")
-    .eq("status", "waiting")
-    .order("created_at", { ascending: false })
-    .limit(50);
-  if (error) {
-    console.error("[fetchStakeTables] Error:", error.message);
-    return [];
-  }
-  return data ?? [];
-}
-
-/** Создать игру со ставкой через RPC */
-export async function createStakeGame(
-  playerId: string,
-  entryFee: number,
-  roomCode: string,
-  boardState: unknown,
-): Promise<{ game_id: string; room_code: string }> {
-  if (!supabase) throw new Error("Supabase не настроен");
-  if (entryFee < 10) throw new Error("Минимальная ставка: 10 токенов");
-  if (entryFee > 10000) throw new Error("Максимальная ставка: 10000 токенов");
-  await setPlayerContext(playerId);
-  const { data, error } = await supabase.rpc("create_stake_game", {
-    p_player_id: playerId,
-    p_entry_fee: entryFee,
-    p_room_code: roomCode,
-    p_board_state: boardState,
-  });
-  if (error) throw new Error(error.message);
-  return data as { game_id: string; room_code: string };
-}
-
-/** Присоединиться к игре со ставкой через RPC */
-export async function joinStakeGame(
-  playerId: string,
-  gameId: string,
-): Promise<{ success: boolean; entry_fee: number }> {
-  if (!supabase) throw new Error("Supabase не настроен");
-  await setPlayerContext(playerId);
-  const { data, error } = await supabase.rpc("join_stake_game", {
-    p_player_id: playerId,
-    p_game_id: gameId,
-  });
-  if (error) throw new Error(error.message);
-  return data as { success: boolean; entry_fee: number };
-}
-
 /**
- * Обработать результат игры через RPC (идемпотентно).
- * Сервер проверяет что вызывающий — участник игры.
- * Сервер проверяет что победитель — участник игры.
- * callerPlayerId — player_id того, кто вызывает функцию.
+ * Завершить игру через защищённый RPC `process_game_result` (см. migration_v3).
+ *
+ * Сервер сам:
+ *  • валидирует, что caller — участник матча,
+ *  • валидирует, что заявленный winner — участник матча,
+ *  • валидирует, что игра ещё не finished (идемпотентно),
+ *  • выставляет games.status = 'finished', winner, resign_reason,
+ *  • если есть ставка — выплачивает приз / возвращает при ничьей,
+ *  • обновляет рейтинг.
+ *
+ * callerPlayerId — игрок, вызывающий RPC. Контекст RLS ставится по нему.
+ * winnerPlayerId — победитель ('' или null для ничьей).
+ *
+ * NOTE: использовать ВМЕСТО старого `process_stake_game_result(color)`,
+ * который ходит по двум таблицам и легко рассинхронизировать.
  */
 export async function processGameResult(
   gameId: string,
@@ -215,12 +162,13 @@ export async function processGameResult(
   callerPlayerId: string,
 ): Promise<{ success: boolean; is_draw: boolean }> {
   if (!supabase) return { success: true, is_draw: false };
-  // Контекст обязателен — сервер проверит авторизацию
-  await setPlayerContext(callerPlayerId);
+  // No more reliance on broken session context — caller passes player_id
+  // explicitly so the RPC can enforce participation server-side.
   const { data, error } = await supabase.rpc("process_game_result", {
     p_game_id: gameId,
     p_winner_player_id: winnerPlayerId ?? "",
     p_finish_reason: finishReason,
+    p_caller_player_id: callerPlayerId,
   });
   if (error) throw new Error(error.message);
   return data as { success: boolean; is_draw: boolean };

@@ -2,6 +2,19 @@ import { useCallback, useRef } from "react";
 
 export type SoundType = "move" | "capture" | "promote" | "win" | "lose";
 
+const SOUND_PREF_KEY = "shashki_sound_enabled";
+
+function soundEnabled(): boolean {
+  try {
+    if (typeof localStorage === "undefined") return true;
+    const v = localStorage.getItem(SOUND_PREF_KEY);
+    // Default ON. Disabled only if user explicitly turned it off.
+    return v !== "0";
+  } catch {
+    return true;
+  }
+}
+
 function playMoveSound(ctx: AudioContext) {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -124,6 +137,7 @@ export function useAudio() {
 
   const play = useCallback(
     (type: SoundType) => {
+      if (!soundEnabled()) return; // honor user mute toggle (home-sound-btn)
       const ctx = ensureContext();
       if (!ctx) return;
       try {

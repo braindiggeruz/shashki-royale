@@ -96,6 +96,8 @@
   "notEnoughCoins": "Bu stavka uchun Coin yetarli emas",
   "loginRequired": "Coin uchun o'ynash uchun tizimga kiring",
   "supabaseNotConfigured": "Onlayn vaqtincha mavjud emas",
+  "preparingProfile": "Profil tayyorlanmoqda…",
+  "freeModeHint": "Balansingiz nol? Lokal o'ynang yoki stavkasiz onlayn",
   "subtitle": "Rus shashka",
   "topPlayers": "Top o'yinchilar",
   "you": "Siz",

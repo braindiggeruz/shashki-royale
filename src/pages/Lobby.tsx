@@ -4,7 +4,8 @@ import { ChevronLeft, Copy, Check, Share2, Users, Zap } from "lucide-react";
 import CustomKeypad from "../components/CustomKeypad.tsx";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase, supabaseConfigured } from "../lib/supabase.ts";
-import { getOrCreatePlayerId, saveActiveGame } from "../lib/storage.ts";
+import { saveActiveGame } from "../lib/storage.ts";
+import { usePlayerId } from "../hooks/usePlayerId";
 import { createRoom, joinRoom, fetchGame, extractRoomCode, findAndJoinRandomRoom, type GameRow } from "../services/gameRooms.ts";
 import PrimaryButton from "../components/PrimaryButton.tsx";
 import { toast } from "sonner";
@@ -19,7 +20,10 @@ function isMobileDevice(): boolean {
 export default function Lobby() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const playerId = getOrCreatePlayerId();
+  // CRITICAL: use the SAME playerId resolver as OnlineGame — otherwise a logged-in
+  // user creates a room as `auth_<uuid>` but Lobby would try to use the localStorage
+  // anonymous `p_xxx`, causing RLS UPDATE failures inside the match.
+  const { playerId } = usePlayerId();
 
   const [mode, setMode] = useState<LobbyMode>("menu");
   const [roomCode, setRoomCode] = useState("");

@@ -12,11 +12,12 @@ import { createInitialBoard } from "../game/initialBoard";
 import { supabaseConfigured } from "../lib/supabase";
 
 /**
- * Quick stake amounts (in Coin).
- * NOTE: DB constraint requires entry_fee >= 10. We use 10/25/50/100/250
- * so no migration is needed and full Coin/QuickMatch flow works end-to-end.
+ * Quick stake amounts (in Coin) — matches the original product spec.
+ * Backed by Supabase RPC `create_stake_game` / `join_stake_game`.
+ * Min stake requires CHECK constraint relaxation (see
+ * supabase/migration_v4_anonymous_ux.sql).
  */
-export const QUICK_STAKES = [10, 25, 50, 100, 250] as const;
+export const QUICK_STAKES = [1, 5, 10, 25, 50] as const;
 export type QuickStake = (typeof QUICK_STAKES)[number];
 
 function generateRoomCode(): string {
@@ -62,21 +63,23 @@ type StakeTable = {
 export default function QuickStakeBar() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { profile, wallet, refresh: refreshProfile } = useProfile();
-  const { playerId, isAuthenticated } = usePlayerId();
+  const { profile, wallet, isLoading: profileLoading, refresh: refreshProfile } = useProfile();
+  const { playerId } = usePlayerId();
   const [busyStake, setBusyStake] = useState<QuickStake | null>(null);
 
   const balance = wallet?.crypto_balance ?? 0;
+  const balanceKnown = !!wallet;
 
   const startQuickMatch = async (stake: QuickStake) => {
     if (!supabaseConfigured) {
-      toast.error(t("supabaseNotConfigured", { defaultValue: "Онлайн недоступен" }));
+      toast.error(t("supabaseNotConfigured", { defaultValue: "Онлайн временно недоступен" }));
       return;
     }
-    if (!isAuthenticated) {
-      // Send user to login, then come back
-      toast.info(t("loginRequired", { defaultValue: "Войдите, чтобы играть на Coin" }));
-      navigate("/auth/login");
+    // Wait for profile to be ready (anonymous bootstrap may still be in-flight)
+    if (profileLoading || !profile) {
+      toast.info(t("preparingProfile", { defaultValue: "Готовим профиль…" }));
+      // Best-effort refresh in case wallet RLS missed first hop
+      await refreshProfile().catch(() => {});
       return;
     }
     if (balance < stake) {
@@ -93,13 +96,11 @@ export default function QuickStakeBar() {
 
     setBusyStake(stake);
     try {
-      // 1) Try to find an existing waiting table with exactly this stake
-      //    that isn't created by me.
       const tables = (await fetchStakeTables()) as unknown as StakeTable[];
-      const candidate = tables.find((t) => {
-        const fee = t.game_stakes?.[0]?.entry_fee ?? 0;
-        const isMine = profile?.id && t.white_profile_id === profile.id;
-        return fee === stake && t.status === "waiting" && !isMine;
+      const candidate = tables.find((tbl) => {
+        const fee = tbl.game_stakes?.[0]?.entry_fee ?? 0;
+        const isMine = profile?.id && tbl.white_profile_id === profile.id;
+        return fee === stake && tbl.status === "waiting" && !isMine;
       });
 
       if (candidate) {
@@ -120,7 +121,6 @@ export default function QuickStakeBar() {
         return;
       }
 
-      // 2) No match found — create a new waiting table with this stake.
       const roomCode = generateRoomCode();
       const board = createInitialBoard();
       const result = await createStakeGame(playerId, stake, roomCode, board);
@@ -138,8 +138,9 @@ export default function QuickStakeBar() {
       });
       navigate("/online-game", { state: { gameId: result.game_id, myColor: "white" } });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Ошибка";
-      toast.error(`${t("error", { defaultValue: "Ошибка" })}: ${msg}`, {
+      const raw = err instanceof Error ? err.message : "Error";
+      const friendly = mapErrorToRussian(raw);
+      toast.error(friendly, {
         style: {
           background: "#2a0a00",
           border: "1px solid rgba(220,50,50,0.5)",
@@ -155,15 +156,15 @@ export default function QuickStakeBar() {
   return (
     <motion.div
       data-testid="quick-stake-bar"
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.25, duration: 0.5 }}
-      className="w-full max-w-sm rounded-2xl px-3 py-3"
+      transition={{ delay: 0.15, duration: 0.4 }}
+      className="w-full max-w-sm rounded-2xl px-3 py-2.5"
       style={{
         background:
-          "linear-gradient(135deg, rgba(184,134,11,0.10) 0%, rgba(255,215,0,0.04) 100%)",
-        border: "1px solid rgba(255,215,0,0.18)",
-        boxShadow: "0 0 24px rgba(212,175,55,0.06)",
+          "linear-gradient(135deg, rgba(184,134,11,0.12) 0%, rgba(255,215,0,0.04) 100%)",
+        border: "1px solid rgba(255,215,0,0.22)",
+        boxShadow: "0 0 18px rgba(212,175,55,0.06)",
       }}
     >
       {/* Header row */}
@@ -179,25 +180,34 @@ export default function QuickStakeBar() {
         </div>
         <div className="flex items-center gap-1">
           <GoldCoin size={12} />
-          <span
-            className="text-xs font-black"
-            style={{ color: "#FFD700", fontFamily: "Cinzel, serif" }}
-            data-testid="qsb-balance"
-          >
-            {balance.toLocaleString()}
-          </span>
+          {balanceKnown ? (
+            <span
+              className="text-xs font-black"
+              style={{ color: "#FFD700", fontFamily: "Cinzel, serif" }}
+              data-testid="qsb-balance"
+            >
+              {balance.toLocaleString()}
+            </span>
+          ) : (
+            <span
+              className="inline-block h-3 w-10 rounded animate-pulse"
+              style={{ background: "rgba(212,175,55,0.25)" }}
+              data-testid="qsb-balance-loading"
+            />
+          )}
         </div>
       </div>
 
-      {/* Stake buttons — horizontal scroll on tight screens */}
+      {/* Stake buttons */}
       <div
-        className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 quick-stake-row"
-        style={{ scrollbarWidth: "none" as const, WebkitOverflowScrolling: "touch" }}
+        className="grid grid-cols-5 gap-1.5"
+        role="group"
+        aria-label={t("quickMatch", { defaultValue: "Быстрый матч" })}
       >
         {QUICK_STAKES.map((stake) => {
-          const affordable = balance >= stake;
+          const affordable = balanceKnown && balance >= stake;
           const isBusy = busyStake === stake;
-          const disabled = !affordable || isBusy || busyStake !== null;
+          const disabled = isBusy || busyStake !== null || (!balanceKnown && !profileLoading) || !affordable;
           return (
             <button
               key={stake}
@@ -205,24 +215,25 @@ export default function QuickStakeBar() {
               data-testid={`qsb-stake-${stake}`}
               onClick={() => void startQuickMatch(stake)}
               disabled={disabled}
-              className="flex-1 min-w-[56px] flex flex-col items-center gap-0.5 py-2 rounded-xl transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed"
+              className="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed"
               style={{
                 background: !affordable
                   ? "rgba(255,255,255,0.03)"
                   : isBusy
                   ? "rgba(255,215,0,0.28)"
-                  : "linear-gradient(135deg, rgba(184,134,11,0.22) 0%, rgba(255,215,0,0.12) 100%)",
+                  : "linear-gradient(135deg, rgba(184,134,11,0.25) 0%, rgba(255,215,0,0.14) 100%)",
                 border: !affordable
                   ? "1px solid rgba(255,255,255,0.06)"
                   : "1px solid rgba(255,215,0,0.45)",
                 color: !affordable ? "rgba(200,150,50,0.35)" : "#FFD700",
-                boxShadow: affordable && !isBusy ? "0 2px 10px rgba(180,140,0,0.18)" : "none",
-                minHeight: 44,
+                boxShadow: affordable && !isBusy ? "0 2px 8px rgba(180,140,0,0.18)" : "none",
+                minHeight: 48,
               }}
+              title={!affordable ? t("notEnoughCoins", { defaultValue: "Не хватает Coin" }) : `${stake} Coin`}
             >
               <GoldCoin size={14} />
               <span
-                className="text-sm font-black leading-none"
+                className="text-xs font-black leading-none"
                 style={{ fontFamily: "Cinzel, serif" }}
               >
                 {stake}
@@ -237,10 +248,30 @@ export default function QuickStakeBar() {
         className="text-[10px] text-center mt-1.5 leading-snug"
         style={{ color: "rgba(212,175,55,0.55)" }}
       >
-        {t("quickMatchHint", {
-          defaultValue: "Тыкни на сумму — мы автоматически найдём тебе соперника",
-        })}
+        {balanceKnown && balance < 1
+          ? t("freeModeHint", { defaultValue: "Нулевой баланс? Играйте локально или онлайн без ставки" })
+          : t("quickMatchHint", {
+              defaultValue: "Выбери ставку — найдём соперника",
+            })}
       </p>
     </motion.div>
   );
+}
+
+function mapErrorToRussian(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes("profile not found") || lower.includes("профиль не найден")) {
+    return "Готовим профиль… Попробуйте через пару секунд";
+  }
+  if (lower.includes("choose the best candidate function") || lower.includes("pgrst203")) {
+    return "Сервер перенастраивается, попробуйте позже";
+  }
+  if (lower.includes("entry_fee") || lower.includes("check constraint")) {
+    return "Эта ставка сейчас недоступна";
+  }
+  if (lower.includes("недостаточно")) return "Недостаточно Coin";
+  if (lower.includes("network") || lower.includes("failed to fetch")) {
+    return "Ошибка сети. Проверьте интернет";
+  }
+  return raw;
 }

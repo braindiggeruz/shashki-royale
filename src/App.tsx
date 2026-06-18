@@ -17,33 +17,37 @@ import LeaderboardPage from "./pages/LeaderboardPage.tsx";
 import StakeLobbyPage from "./pages/StakeLobbyPage.tsx";
 import WalletPage from "./pages/WalletPage.tsx";
 import { useServiceWorker } from "./hooks/use-service-worker.ts";
+import { useAnonymousBootstrap } from "./hooks/useAnonymousBootstrap.ts";
 import "./i18n.ts";
 
 function AppInner() {
   useServiceWorker();
+  // Auto-create anonymous player/profile/wallet on first visit.
+  useAnonymousBootstrap();
+
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Routes */}
+        {/* Public routes — anonymous players play immediately, no login wall */}
         <Route path="/" element={<Index />} />
         <Route path="/rules" element={<Rules />} />
-        
-        {/* Auth Routes */}
+        <Route path="/local" element={<LocalGame />} />
+        <Route path="/lobby" element={<Lobby />} />
+        <Route path="/online-game" element={<OnlineGame />} />
+        <Route path="/stake-lobby" element={<StakeLobbyPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/leaderboard" element={<LeaderboardPage />} />
+        <Route path="/wallet" element={<WalletPage />} />
+
+        {/* Auth routes are optional — reachable from /profile if user wants
+            to upgrade their anonymous account to a real one. Keep them so
+            existing accounts still work. */}
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/register" element={<RegisterPage />} />
         <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-        
-        {/* Protected Routes */}
-        <Route path="/local" element={<ProtectedRoute><LocalGame /></ProtectedRoute>} />
-        <Route path="/lobby" element={<ProtectedRoute><Lobby /></ProtectedRoute>} />
-        <Route path="/online-game" element={<ProtectedRoute><OnlineGame /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-        <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
-        <Route path="/stake-lobby" element={<ProtectedRoute><StakeLobbyPage /></ProtectedRoute>} />
-        <Route path="/wallet" element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
-        
+        <Route path="/auth/reset-password" element={<ProtectedRoute><ResetPasswordPage /></ProtectedRoute>} />
+
         {/* 404 */}
         <Route path="*" element={<NotFound />} />
       </Routes>

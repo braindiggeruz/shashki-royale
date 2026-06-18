@@ -96,6 +96,8 @@
   "notEnoughCoins": "Недостаточно Coin для этой ставки",
   "loginRequired": "Войдите, чтобы играть на Coin",
   "supabaseNotConfigured": "Онлайн временно недоступен",
+  "preparingProfile": "Готовим профиль…",
+  "freeModeHint": "Нулевой баланс? Играйте локально или онлайн без ставки",
   "subtitle": "Русские шашки",
   "topPlayers": "Топ игроков",
   "you": "Вы",

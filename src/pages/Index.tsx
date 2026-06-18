@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { RotateCcw, User, Trophy, ListChecks } from "lucide-react";
+import { RotateCcw, User, Trophy, ListChecks, Volume2, VolumeX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import PrimaryButton from "../components/PrimaryButton.tsx";
 import DebugPanel from "../components/DebugPanel.tsx";
@@ -13,6 +13,8 @@ import { supabaseConfigured } from "../lib/supabase.ts";
 import { useProfile } from "../hooks/use-profile.ts";
 import { WalletDisplay } from "../components/WalletDisplay.tsx";
 
+const SOUND_KEY = "shashki_sound_enabled";
+
 export default function Index() {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -20,13 +22,28 @@ export default function Index() {
   const [activeGame, setActiveGame] = useState<ActiveGame | null>(null);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resumeError, setResumeError] = useState<string | null>(null);
+  const [soundOn, setSoundOn] = useState<boolean>(() => {
+    if (typeof localStorage === "undefined") return true;
+    const v = localStorage.getItem(SOUND_KEY);
+    return v === null ? true : v === "1";
+  });
 
   useEffect(() => {
     const saved = loadActiveGame();
-    if (saved && supabaseConfigured) {
-      setActiveGame(saved);
-    }
+    if (saved && supabaseConfigured) setActiveGame(saved);
   }, []);
+
+  const toggleSound = () => {
+    setSoundOn((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SOUND_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   const handleResume = async () => {
     if (!activeGame) return;
@@ -59,33 +76,52 @@ export default function Index() {
   return (
     <div
       data-testid="home-screen"
-      className="min-h-[100dvh] flex flex-col items-center gap-3 sm:gap-4 px-4 sm:px-6 safe-pt safe-pb safe-px relative"
+      className="min-h-[100dvh] flex flex-col items-center px-4 sm:px-5 safe-pt safe-pb safe-px relative"
       style={{
         background: "radial-gradient(ellipse at center, #2C1810 0%, #0A0503 100%)",
-        paddingTop: "max(env(safe-area-inset-top, 0px), 12px)",
+        paddingTop: "max(env(safe-area-inset-top, 0px), 10px)",
+        gap: "10px",
       }}
     >
-      {/* Top bar: profile + balance + leaderboard + compact locale */}
-      <div className="w-full max-w-sm flex items-center justify-between gap-2">
-        <div className="flex gap-2 items-center min-w-0">
+      {/* Header: profile + wallet · sound + leaderboard + locale */}
+      <div className="w-full max-w-sm flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
           <button
             onClick={() => navigate("/profile")}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl cursor-pointer transition-all shrink-0"
-            style={{ background: "rgba(212,175,55,0.08)", border: "1px solid rgba(212,175,55,0.15)" }}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-xl cursor-pointer transition-all active:scale-95 shrink-0"
+            style={{ background: "rgba(212,175,55,0.08)", border: "1px solid rgba(212,175,55,0.18)" }}
             data-testid="home-profile-btn"
+            title={t("profile")}
           >
             <User className="w-3.5 h-3.5" style={{ color: "#D4AF37" }} />
-            <span className="text-xs max-w-[72px] truncate" style={{ color: "#D4AF37", fontFamily: "Cinzel, serif" }}>
+            <span
+              className="text-xs max-w-[64px] truncate"
+              style={{ color: "#D4AF37", fontFamily: "Cinzel, serif" }}
+            >
               {profile ? profile.nickname.slice(0, 10) : t("profile")}
             </span>
           </button>
           <WalletDisplay />
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={toggleSound}
+            className="p-1.5 rounded-xl cursor-pointer active:scale-95"
+            style={{ background: "rgba(212,175,55,0.08)", border: "1px solid rgba(212,175,55,0.18)" }}
+            title={soundOn ? "Sound on" : "Sound off"}
+            aria-label={soundOn ? "Sound on" : "Sound off"}
+            data-testid="home-sound-btn"
+          >
+            {soundOn ? (
+              <Volume2 className="w-4 h-4" style={{ color: "#D4AF37" }} />
+            ) : (
+              <VolumeX className="w-4 h-4" style={{ color: "rgba(212,175,55,0.45)" }} />
+            )}
+          </button>
           <button
             onClick={() => navigate("/leaderboard")}
-            className="p-1.5 rounded-xl cursor-pointer"
-            style={{ background: "rgba(212,175,55,0.08)", border: "1px solid rgba(212,175,55,0.15)" }}
+            className="p-1.5 rounded-xl cursor-pointer active:scale-95"
+            style={{ background: "rgba(212,175,55,0.08)", border: "1px solid rgba(212,175,55,0.18)" }}
             title={t("leaderboard")}
             data-testid="home-leaderboard-btn"
           >
@@ -97,16 +133,16 @@ export default function Index() {
 
       {/* Logo */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: "easeOut" }}
-        className="flex flex-col items-center gap-1 mt-1"
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="flex flex-col items-center mt-1"
       >
         <motion.div
           initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-          style={{ filter: "drop-shadow(0 0 18px rgba(212,175,55,0.65))" }}
+          transition={{ delay: 0.15, duration: 0.5 }}
+          style={{ filter: "drop-shadow(0 0 16px rgba(212,175,55,0.6))" }}
         >
           <svg viewBox="0 0 80 52" width="56" height="36" className="sm:w-[72px] sm:h-[46px]">
             <defs>
@@ -116,12 +152,7 @@ export default function Index() {
                 <stop offset="100%" stopColor="#B8860B" />
               </linearGradient>
             </defs>
-            <path
-              d="M8 44 L14 16 L26 32 L40 4 L54 32 L66 16 L72 44 Z"
-              fill="url(#crownGrad)"
-              stroke="#FFE066"
-              strokeWidth="1"
-            />
+            <path d="M8 44 L14 16 L26 32 L40 4 L54 32 L66 16 L72 44 Z" fill="url(#crownGrad)" stroke="#FFE066" strokeWidth="1" />
             <rect x="8" y="40" width="64" height="10" rx="3" fill="url(#crownGrad)" stroke="#FFE066" strokeWidth="0.8" />
             <circle cx="40" cy="6" r="4" fill="#DC143C" stroke="#FFD700" strokeWidth="0.8" />
             <circle cx="14" cy="17" r="3" fill="#DC143C" stroke="#FFD700" strokeWidth="0.8" />
@@ -132,7 +163,7 @@ export default function Index() {
           </svg>
         </motion.div>
 
-        <div className="text-center">
+        <div className="text-center mt-1">
           <h1
             className="text-3xl sm:text-4xl font-black tracking-widest uppercase leading-none"
             style={{
@@ -158,7 +189,7 @@ export default function Index() {
             РОЯЛЬ
           </h1>
           <p
-            className="text-[10px] tracking-[0.3em] uppercase mt-1"
+            className="text-[10px] tracking-[0.3em] uppercase mt-0.5"
             style={{ color: "rgba(212,175,55,0.6)", fontFamily: "Montserrat, sans-serif" }}
           >
             {t("subtitle", { defaultValue: "Русские шашки" })}
@@ -166,13 +197,13 @@ export default function Index() {
         </div>
       </motion.div>
 
-      {/* Resume game card (if any) */}
+      {/* Resume banner (if any) */}
       <AnimatePresence>
         {activeGame && (
           <motion.div
-            initial={{ opacity: 0, y: -8, height: 0 }}
+            initial={{ opacity: 0, y: -6, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}
-            exit={{ opacity: 0, y: -8, height: 0 }}
+            exit={{ opacity: 0, y: -6, height: 0 }}
             className="w-full max-w-sm overflow-hidden"
           >
             <div
@@ -238,11 +269,11 @@ export default function Index() {
         )}
       </AnimatePresence>
 
-      {/* Main "Play Online" CTA */}
+      {/* Play online — primary CTA */}
       <motion.div
-        initial={{ opacity: 0, y: 18 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.5 }}
+        transition={{ delay: 0.2, duration: 0.4 }}
         className="w-full max-w-sm"
       >
         <PrimaryButton onClick={() => navigate("/lobby")} variant="red">
@@ -250,21 +281,21 @@ export default function Index() {
         </PrimaryButton>
       </motion.div>
 
-      {/* Quick stake bar (Coin) — the core game economy entry point */}
+      {/* Quick Match (Coin) */}
       {supabaseConfigured && <QuickStakeBar />}
 
       {/* All tables / custom stake */}
       {supabaseConfigured && (
         <motion.button
-          initial={{ opacity: 0, y: 8 }}
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35, duration: 0.4 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
           onClick={() => navigate("/stake-lobby")}
           className="w-full max-w-sm flex items-center justify-center gap-2 py-2.5 rounded-xl cursor-pointer transition-all active:scale-95"
           style={{
             background: "rgba(255,255,255,0.03)",
             border: "1px solid rgba(212,175,55,0.22)",
-            color: "rgba(220,180,80,0.9)",
+            color: "rgba(220,180,80,0.95)",
             fontFamily: "Cinzel, serif",
           }}
           data-testid="all-tables-btn"
@@ -276,13 +307,13 @@ export default function Index() {
         </motion.button>
       )}
 
-      {/* Secondary CTAs */}
+      {/* Secondary CTAs — natural flow, no flex push */}
       <motion.div
-        data-testid="home-actions"
-        initial={{ opacity: 0, y: 18 }}
+        data-testid="home-secondary"
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4, duration: 0.5 }}
-        className="w-full max-w-sm flex flex-col gap-2 relative z-10 mt-auto"
+        transition={{ delay: 0.35, duration: 0.4 }}
+        className="w-full max-w-sm flex flex-col gap-2"
       >
         <PrimaryButton onClick={() => navigate("/local")} variant="ghost">
           {t("playLocal")}
@@ -293,8 +324,8 @@ export default function Index() {
       </motion.div>
 
       {/* Footer */}
-      <div className="flex flex-col items-center gap-1 relative z-10 pb-1">
-        <p className="text-[10px]" style={{ color: "rgba(212,175,55,0.25)" }}>
+      <div className="flex flex-col items-center pt-1 pb-1">
+        <p className="text-[9px]" style={{ color: "rgba(212,175,55,0.25)" }}>
           © Шашки Рояль 2026 · Coin — внутренняя игровая валюта
         </p>
       </div>

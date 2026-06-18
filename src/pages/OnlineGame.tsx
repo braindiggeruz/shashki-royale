@@ -12,11 +12,10 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
   fetchGame,
   updateGameState,
-  finishGame,
   insertMove,
   type GameRow,
 } from "../services/gameRooms.ts";
-import { processGameResult, getOrCreateProfile, type Profile } from "../services/profiles.ts";
+import { getOrCreateProfile, type Profile } from "../services/profiles.ts";
 import {
   generateLegalMoves,
   generateLegalMovesForPiece,
@@ -417,39 +416,40 @@ export default function OnlineGame() {
 
           try {
             if (result.over) {
-              await finishGame(
+              // Финализация: ВАЖНО — порядок имеет значение.
+              // 1) Сначала сохраняем финальную позицию (board_state),
+              //    статус игры пока остаётся 'playing'.
+              await updateGameState(
                 gameId,
                 newBoard,
-                result.winner === "draw" ? null : result.winner,
-                result.reason,
+                nextTurn,
                 newMoveNumber,
                 myColor,
+                matchingMove.fromRow,
+                matchingMove.fromCol,
+                matchingMove.finalRow,
+                matchingMove.finalCol,
               );
+
               play(result.winner === myColor ? "win" : result.winner === "draw" ? "win" : "lose");
-              // Обрабатываем ставки через защищённый RPC
+
+              // 2) Защищённый RPC: ставит status='finished', winner, reason,
+              //    проводит расчёт ставки и обновляет рейтинг.
+              //    Идемпотентно по escrow_status, безопасно дёргать повторно.
               try {
                 setIsProcessingResult(true);
-                // playerId уже получен из usePlayerId() хука
-                
-                // Check if it's a stake game by trying to process it as one
                 const stakeResultData = await handleFinishGame(
                   gameId,
                   result.winner as "white" | "black" | "draw",
                   result.reason,
-                  playerId
+                  playerId,
                 );
-                
+
                 if (stakeResultData.result) {
                   setStakeResult(stakeResultData.result);
-                } else {
-                  // Not a stake game or error, fallback to standard profile update
-                  await processGameResult(
-                    gameId,
-                    result.winner === "draw" ? null : (result.winner === myColor ? myColor : (myColor === "white" ? "black" : "white")),
-                    result.reason,
-                    myColor,
-                  );
                 }
+                // Для не-ставочных игр модалка не нужна — обычный GameOverModal
+                // покажется автоматически.
               } catch (stakeErr) {
                 console.error("[OnlineGame] processGameResult error:", stakeErr);
               } finally {
@@ -514,7 +514,14 @@ export default function OnlineGame() {
     clearActiveGame();
     setGameState((prev) => ({ ...prev, gameOver: true, winner, winReason: reason }));
     play("lose");
-    await finishGame(gameId, gameState.board, winner, reason, gameState.moveNumber, myColor);
+    // Защищённый путь: processGameResult сам ставит status='finished',
+    // расчёт ставки и обновление рейтинга.
+    try {
+      const stakeResultData = await handleFinishGame(gameId, winner, reason, playerId);
+      if (stakeResultData.result) setStakeResult(stakeResultData.result);
+    } catch (err) {
+      console.error("[OnlineGame] handleResign error:", err);
+    }
   };
 
   const handleOpponentLeftWin = async () => {
@@ -525,7 +532,12 @@ export default function OnlineGame() {
     setOpponentLeft(false);
     setGameState((prev) => ({ ...prev, gameOver: true, winner: myColor, winReason: reason }));
     play("win");
-    await finishGame(gameId, gameState.board, myColor, reason, gameState.moveNumber, myColor);
+    try {
+      const stakeResultData = await handleFinishGame(gameId, myColor, reason, playerId);
+      if (stakeResultData.result) setStakeResult(stakeResultData.result);
+    } catch (err) {
+      console.error("[OnlineGame] handleOpponentLeftWin error:", err);
+    }
   };
 
   const hasMandatory = isMyTurn && !gameState.gameOver && gameState.legalMoves.some((m) => m.isCapture);

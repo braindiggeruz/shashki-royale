@@ -32,7 +32,10 @@ export type WalletTransaction = {
 };
 
 /**
- * Получить кошелёк пользователя
+ * Получить кошелёк пользователя.
+ *
+ * SECURITY: дополнительно фильтруем по profile.player_id чтобы НИКОГДА не
+ * вернуть чужой wallet, даже если setPlayerContext() молча упал.
  */
 export async function getWallet(playerId: string): Promise<Wallet | null> {
   if (!supabase) return null;
@@ -40,18 +43,32 @@ export async function getWallet(playerId: string): Promise<Wallet | null> {
   try {
     await setPlayerContext(playerId);
 
+    // 1) Найти свой profile.id строго по player_id
+    const { data: profileRow, error: profileErr } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("player_id", playerId)
+      .maybeSingle();
+
+    if (profileErr) {
+      console.error("[getWallet] profile lookup error:", profileErr.message);
+      return null;
+    }
+    if (!profileRow) return null; // профиль ещё не создан — wallet тоже нет
+
+    // 2) Кошелёк только для этого profile_id
     const { data, error } = await supabase
       .from("wallets")
       .select("*")
-      .limit(1)
-      .single();
+      .eq("profile_id", profileRow.id)
+      .maybeSingle();
 
     if (error) {
       console.error("[getWallet] Error:", error.message);
       return null;
     }
 
-    return data as Wallet;
+    return (data as Wallet) ?? null;
   } catch (err) {
     console.error("[getWallet] Error:", err);
     return null;
@@ -99,9 +116,9 @@ export async function createStakeGame(
 ): Promise<{ game_id: string; room_code: string; error: string | null }> {
   if (!supabase) return { game_id: "", room_code: "", error: "Supabase не настроен" };
 
-  // Frontend валидация
-  if (entryFee < 10) return { game_id: "", room_code: "", error: "Минимальная ставка: 10 токенов" };
-  if (entryFee > 10000) return { game_id: "", room_code: "", error: "Максимальная ставка: 10000 токенов" };
+  // Frontend валидация (после миграции v4 минимум = 1 Coin)
+  if (entryFee < 1) return { game_id: "", room_code: "", error: "Минимальная ставка: 1 Coin" };
+  if (entryFee > 10000) return { game_id: "", room_code: "", error: "Максимальная ставка: 10000 Coin" };
   if (!Number.isFinite(entryFee) || entryFee !== Math.floor(entryFee)) {
     return { game_id: "", room_code: "", error: "Ставка должна быть целым числом" };
   }
