@@ -164,7 +164,7 @@ export default function StakeLobbyPage() {
       toast.success(`🏆 Входим в игру! Взнос: ${fee} 🪙`, {
         style: { background: "#0d2200", border: "1px solid rgba(100,200,50,0.4)", color: "#90ee90" },
       });
-      navigate("/online-game", { state: { gameId: table.id, myColor: "black" } });
+      navigate("/online-game", { state: { gameId: table.id, myColor: "black", stake: fee } });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Ошибка подключения";
       toast.error(`Ошибка: ${msg}`, {
@@ -451,11 +451,11 @@ export default function StakeLobbyPage() {
             profileId={profile?.id ?? null}
             playerId={playerId}
             onClose={() => setShowCreate(false)}
-            onCreated={async (gameId, roomCode) => {
+            onCreated={async (gameId, roomCode, stake) => {
               setShowCreate(false);
               await refreshProfile();
               void loadTables();
-              navigate("/online-game", { state: { gameId, myColor: "white" } });
+              navigate("/online-game", { state: { gameId, myColor: "white", stake } });
             }}
           />
         )}
@@ -479,7 +479,7 @@ function CreateTableModal({
   profileId: string | null;
   playerId: string;
   onClose: () => void;
-  onCreated: (gameId: string, roomCode: string) => Promise<void>;
+  onCreated: (gameId: string, roomCode: string, stake: number) => Promise<void>;
 }) {
   const [selectedFee, setSelectedFee] = useState<number>(5);
   const [creating, setCreating] = useState(false);
@@ -505,7 +505,7 @@ function CreateTableModal({
       toast.success(`♛ Стол создан! Ждём соперника...`, {
         style: { background: "#0d2200", border: "1px solid rgba(100,200,50,0.4)", color: "#90ee90" },
       });
-      await onCreated(result.game_id, result.room_code);
+      await onCreated(result.game_id, result.room_code, selectedFee);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Ошибка создания стола";
       toast.error(`Ошибка: ${msg}`, {

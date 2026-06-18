@@ -117,7 +117,7 @@ export default function QuickStakeBar() {
         toast.success(`⚔️ ${t("opponentFound", { defaultValue: "Соперник найден!" })} (${stake} Coin)`, {
           style: { background: "#0d2200", border: "1px solid rgba(100,200,50,0.4)", color: "#90ee90" },
         });
-        navigate("/online-game", { state: { gameId: candidate.id, myColor: "black" } });
+        navigate("/online-game", { state: { gameId: candidate.id, myColor: "black", stake } });
         return;
       }
 
@@ -133,10 +133,7 @@ export default function QuickStakeBar() {
         savedAt: Date.now(),
       });
       await refreshProfile();
-      toast.success(`♛ ${t("searchingOpponent", { defaultValue: "Ищем соперника..." })} (${stake} Coin)`, {
-        style: { background: "#0d2200", border: "1px solid rgba(100,200,50,0.4)", color: "#90ee90" },
-      });
-      navigate("/online-game", { state: { gameId: result.game_id, myColor: "white" } });
+      navigate("/online-game", { state: { gameId: result.game_id, myColor: "white", stake } });
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Error";
       const friendly = mapErrorToRussian(raw);

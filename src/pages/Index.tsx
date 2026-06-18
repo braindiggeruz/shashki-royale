@@ -5,7 +5,6 @@ import { RotateCcw, User, Trophy, ListChecks, Volume2, VolumeX } from "lucide-re
 import { useTranslation } from "react-i18next";
 import PrimaryButton from "../components/PrimaryButton.tsx";
 import DebugPanel from "../components/DebugPanel.tsx";
-import LocaleSwitcher from "../components/LocaleSwitcher.tsx";
 import QuickStakeBar from "../components/QuickStakeBar.tsx";
 import { loadActiveGame, clearActiveGame, type ActiveGame } from "../lib/storage.ts";
 import { fetchGame } from "../services/gameRooms.ts";
@@ -127,7 +126,6 @@ export default function Index() {
           >
             <Trophy className="w-4 h-4" style={{ color: "#D4AF37" }} />
           </button>
-          <LocaleSwitcher compact />
         </div>
       </div>
 

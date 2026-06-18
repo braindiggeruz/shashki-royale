@@ -3,7 +3,6 @@ import { initReactI18next } from "react-i18next";
 
 export const SUPPORTED_LOCALES = {
   ru: { code: "ru", emoji: "🇷🇺", name: "Russian", nativeName: "Русский", dir: "ltr" },
-  uz: { code: "uz", emoji: "🇺🇿", name: "Uzbek", nativeName: "O'zbekcha", dir: "ltr" },
 } as const;
 
 export const DEFAULT_LOCALE: keyof typeof SUPPORTED_LOCALES = "ru";

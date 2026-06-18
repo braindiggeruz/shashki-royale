@@ -216,38 +216,32 @@ export default function LocalGame() {
         />
       </div>
 
-      {/* Captured piece counts */}
+      {/* Captured piece counts — compact pill (no overlap) */}
       <div className="px-4 pb-4 flex-shrink-0">
-        <div className="flex justify-between gap-3">
-          {(["black", "white"] as PlayerColor[]).map((color) => {
+        <div className="flex justify-center gap-2">
+          {(["white", "black"] as PlayerColor[]).map((color) => {
             const remaining = gameState.board.flat().filter((c) => c?.color === color).length;
             const captured = 12 - remaining;
-            const isActive = gameState.currentTurn === color;
             return (
               <div
                 key={color}
-                className="flex-1 flex items-center justify-between px-3 py-2 rounded-xl"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
                 style={{
-                  background: isActive ? "rgba(212,175,55,0.06)" : "rgba(255,255,255,0.02)",
-                  border: `1px solid ${isActive ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.05)"}`,
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(212,175,55,0.12)",
                 }}
               >
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className="w-3 h-3 rounded-full border"
-                    style={{
-                      background: color === "white"
-                        ? "radial-gradient(circle at 35% 35%, #FFFFFF 0%, #D4B896 100%)"
-                        : "radial-gradient(circle at 35% 35%, #555 0%, #000 100%)",
-                      borderColor: "#D4AF37",
-                    }}
-                  />
-                  <span className="text-xs" style={{ color: "rgba(212,175,55,0.55)", fontFamily: "Cinzel, serif" }}>
-                    {color === "white" ? "Белые" : "Чёрные"}
-                  </span>
-                </div>
-                <span className="text-xs font-bold" style={{ color: captured > 0 ? "#FFD700" : "rgba(212,175,55,0.3)" }}>
-                  Срублено: {captured}
+                <div
+                  className="w-2.5 h-2.5 rounded-full border"
+                  style={{
+                    background: color === "white"
+                      ? "radial-gradient(circle at 35% 35%, #FFFFFF 0%, #D4B896 100%)"
+                      : "radial-gradient(circle at 35% 35%, #555 0%, #000 100%)",
+                    borderColor: "#D4AF37",
+                  }}
+                />
+                <span className="text-[11px] font-bold" style={{ color: captured > 0 ? "#FFD700" : "rgba(212,175,55,0.35)", fontFamily: "Cinzel, serif" }}>
+                  {captured}
                 </span>
               </div>
             );

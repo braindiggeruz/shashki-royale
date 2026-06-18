@@ -7,6 +7,7 @@ import GameOverModal from "../components/GameOverModal.tsx";
 import { GameResultModal, type GameResult } from "../components/GameResultModal.tsx";
 import DebugPanel from "../components/DebugPanel.tsx";
 import PlayerCard from "../components/PlayerCard.tsx";
+import MatchmakingOverlay from "../components/MatchmakingOverlay.tsx";
 import { supabase, supabaseConfigured, setPlayerContext } from "../lib/supabase.ts";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
@@ -16,6 +17,8 @@ import {
   type GameRow,
 } from "../services/gameRooms.ts";
 import { getOrCreateProfile, type Profile } from "../services/profiles.ts";
+import { cancelStakeGame, getGameStake } from "../services/stakes.ts";
+import { toast } from "sonner";
 import {
   generateLegalMoves,
   generateLegalMovesForPiece,
@@ -37,6 +40,7 @@ import { usePlayerId } from "../hooks/usePlayerId";
 type OnlineGameLocationState = {
   gameId: string;
   myColor: PlayerColor;
+  stake?: number;
 };
 
 type LastMove = {
@@ -78,6 +82,7 @@ export default function OnlineGame() {
 
   const locationState = (location.state ?? {}) as Partial<OnlineGameLocationState>;
   const { gameId, myColor } = resolveGameParams(locationState, searchParams);
+  const initialStake = typeof locationState.stake === "number" ? locationState.stake : null;
 
   // Update URL so page can be refreshed
   useEffect(() => {
@@ -132,6 +137,10 @@ export default function OnlineGame() {
   const [isProcessingResult, setIsProcessingResult] = useState(false);
   const [myProfile, setMyProfile] = useState<Profile | null>(null);
   const [opponentProfile, setOpponentProfile] = useState<Profile | null>(null);
+  // Matchmaking overlay state — only shown to game creator (white) while waiting
+  const [gameStatus, setGameStatus] = useState<string>("waiting");
+  const [stakeAmount, setStakeAmount] = useState<number | null>(initialStake);
+  const [cancellingMatch, setCancellingMatch] = useState(false);
   const { handleFinishGame } = useGameResult();
   const opponentMovedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -172,6 +181,10 @@ export default function OnlineGame() {
       const currentTurn = game.current_turn as PlayerColor;
       const isFinished = game.status === "finished";
       const legalMoves = isFinished ? [] : generateLegalMoves(board, currentTurn);
+
+      // Track high-level status so the matchmaking overlay can hide as soon as
+      // the game flips from 'waiting' to 'active'.
+      setGameStatus(game.status);
 
       if (isFinished) {
         gameOverRef.current = true;
@@ -303,6 +316,17 @@ export default function OnlineGame() {
       const saved = loadActiveGame();
       if (saved && saved.gameId === gameId && !saved.roomCode) {
         saveActiveGame({ ...saved, roomCode: game.room_code, savedAt: Date.now() });
+      }
+
+      // If we don't have the stake amount yet (e.g. page reloaded mid-search),
+      // fetch it once so the matchmaking overlay can display it.
+      if (stakeAmount == null) {
+        try {
+          const s = await getGameStake(gameId);
+          if (!cancelled.v && s) setStakeAmount(Number(s.entry_fee));
+        } catch {
+          /* non-fatal */
+        }
       }
     };
 
@@ -521,6 +545,45 @@ export default function OnlineGame() {
       if (stakeResultData.result) setStakeResult(stakeResultData.result);
     } catch (err) {
       console.error("[OnlineGame] handleResign error:", err);
+    }
+  };
+
+  /**
+   * Cancel matchmaking (only valid while game.status === 'waiting' and we are
+   * the creator). For stake games this calls cancel_stake_game RPC which
+   * refunds the locked stake. For non-stake games it just navigates home.
+   */
+  const handleCancelMatchmaking = async () => {
+    if (!gameId || cancellingMatch) return;
+    setCancellingMatch(true);
+    try {
+      if (stakeAmount != null && stakeAmount > 0) {
+        const res = await cancelStakeGame(playerId, gameId);
+        if (res.error) {
+          // If cancel failed because game already started, just stay in the game.
+          if (res.error.includes("уже началась")) {
+            toast.info("Игра уже началась — соперник присоединился");
+            setCancellingMatch(false);
+            return;
+          }
+          toast.error(res.error, {
+            style: {
+              background: "#2a0a00",
+              border: "1px solid rgba(220,50,50,0.5)",
+              color: "#ffd700",
+              fontFamily: "Cinzel, serif",
+            },
+          });
+        }
+      }
+      clearActiveGame();
+      gameOverRef.current = true;
+      navigate("/");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Не удалось отменить";
+      toast.error(msg);
+    } finally {
+      setCancellingMatch(false);
     }
   };
 
@@ -783,7 +846,7 @@ export default function OnlineGame() {
       </div>
 
       {/* My Player Card (bottom) */}
-      <div className="px-4 py-2">
+      <div className="px-4 py-2 pb-4">
         <PlayerCard
           profile={myProfile}
           color={myColor ?? "white"}
@@ -791,45 +854,19 @@ export default function OnlineGame() {
         />
       </div>
 
-      {/* Captured piece counts */}
-      <div className="px-4 pb-4 flex-shrink-0">
-        <div className="flex justify-between gap-3">
-          {(["black", "white"] as PlayerColor[]).map((color) => {
-            const remaining = gameState.board.flat().filter((c) => c?.color === color).length;
-            const captured = 12 - remaining;
-            const isActive = gameState.currentTurn === color;
-            const isMe = color === myColor;
-            return (
-              <div
-                key={color}
-                className="flex-1 flex items-center justify-between px-3 py-2 rounded-xl"
-                style={{
-                  background: isActive ? "rgba(212,175,55,0.06)" : "rgba(255,255,255,0.02)",
-                  border: `1px solid ${isActive ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.05)"}`,
-                }}
-              >
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className="w-3 h-3 rounded-full border"
-                    style={{
-                      background: color === "white"
-                        ? "radial-gradient(circle at 35% 35%, #FFFFFF 0%, #D4B896 100%)"
-                        : "radial-gradient(circle at 35% 35%, #555 0%, #000 100%)",
-                      borderColor: "#D4AF37",
-                    }}
-                  />
-                  <span className="text-xs" style={{ color: "rgba(212,175,55,0.55)", fontFamily: "Cinzel, serif" }}>
-                    {isMe ? "Вы" : "Соперник"}
-                  </span>
-                </div>
-                <span className="text-xs font-bold" style={{ color: captured > 0 ? "#FFD700" : "rgba(212,175,55,0.3)" }}>
-                  Срублено: {captured}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {/* Matchmaking overlay — shown to white (creator) while waiting for opponent */}
+      <AnimatePresence>
+        {myColor === "white" &&
+          !opponentConnected &&
+          gameStatus === "waiting" &&
+          !gameState.gameOver && (
+            <MatchmakingOverlay
+              stake={stakeAmount}
+              onCancel={handleCancelMatchmaking}
+              cancelling={cancellingMatch}
+            />
+          )}
+      </AnimatePresence>
 
       {/* Resign confirm */}
       <AnimatePresence>

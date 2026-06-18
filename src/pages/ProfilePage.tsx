@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 import { useProfile, invalidateProfileCache } from "../hooks/use-profile.ts";
 import { updateProfile } from "../services/profiles.ts";
 import { usePlayerId } from "../hooks/usePlayerId";
-import LocaleSwitcher from "../components/LocaleSwitcher.tsx";
 import { supabaseConfigured } from "../lib/supabase.ts";
 import { toast } from "sonner";
 import { getTierInfo, getTierProgress, getWinRate } from "../lib/rating.ts";
@@ -146,20 +145,6 @@ export default function ProfilePage() {
               {profile.total_games > 0 && (
                 <WinRateBar wins={profile.wins} losses={profile.losses} draws={profile.draws} t={t} />
               )}
-            </motion.div>
-
-            {/* Language Card */}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="rounded-2xl p-5"
-              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
-            >
-              <p className="text-xs uppercase tracking-widest mb-4" style={{ color: "rgba(200,150,50,0.5)", fontFamily: "Cinzel, serif" }}>
-                {t("language")}
-              </p>
-              <LocaleSwitcher />
             </motion.div>
 
             {/* Virtual currency note */}
