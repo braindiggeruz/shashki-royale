@@ -269,6 +269,13 @@ export async function cancelStakeGame(
 
 /**
  * Получить активные столы со ставками
+ *
+ * IMPORTANT: the foreign-key on the join MUST be `games_white_profile_id_fkey`
+ * (a real FK from games.white_profile_id → profiles.id). The legacy hint
+ * `games_white_player_id_fkey` does NOT exist — `games.white_player_id` is
+ * just a TEXT player_id column with no FK — and using it makes PostgREST
+ * return PGRST200 ("Could not find a relationship…"), which silently turned
+ * this function into a "return [] always" matchmaker-killer.
  */
 export async function fetchStakeTables(limit: number = 50) {
   if (!supabase) return [];
@@ -278,9 +285,9 @@ export async function fetchStakeTables(limit: number = 50) {
       .from("games")
       .select(
         `
-        id, room_code, status, white_player_id,
+        id, room_code, status, white_player_id, white_profile_id, match_type,
         game_stakes(entry_fee, pot_amount, escrow_status),
-        white_profile:profiles!games_white_player_id_fkey(id, nickname, avatar_index, rating)
+        white_profile:profiles!games_white_profile_id_fkey(id, nickname, avatar_index, rating)
       `,
       )
       .eq("status", "waiting")
