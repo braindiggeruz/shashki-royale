@@ -47,6 +47,13 @@ jobs:
         run: |
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
+      - name: Install Gradle 8.4
+        run: |
+          curl -sL https://services.gradle.org/distributions/gradle-8.4-bin.zip -o /tmp/gradle.zip
+          unzip -q -o /tmp/gradle.zip -d $HOME/
+          echo "$HOME/gradle-8.4/bin" >> $GITHUB_PATH
+          $HOME/gradle-8.4/bin/gradle --version
+
       - name: Build release APK
         working-directory: android
         env:
@@ -55,7 +62,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'shashki' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'shashki2026' }}
         run: |
-          gradle assembleRelease assembleDebug --no-daemon
+          $HOME/gradle-8.4/bin/gradle assembleRelease assembleDebug --no-daemon
 
       - name: Rename APKs
         run: |
