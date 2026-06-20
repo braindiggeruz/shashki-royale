@@ -10,12 +10,7 @@ import PlayerCard from "../components/PlayerCard.tsx";
 import MatchmakingOverlay from "../components/MatchmakingOverlay.tsx";
 import { supabase, supabaseConfigured, setPlayerContext } from "../lib/supabase.ts";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import {
-  fetchGame,
-  updateGameState,
-  insertMove,
-  type GameRow,
-} from "../services/gameRooms.ts";
+import { fetchGame, type GameRow } from "../services/gameRooms.ts";
 import { submitMove, submitResign } from "../services/secureMoves.ts";
 import { getOrCreateProfile, type Profile } from "../services/profiles.ts";
 import { cancelStakeGame, getGameStake } from "../services/stakes.ts";
@@ -444,119 +439,70 @@ export default function OnlineGame() {
           }));
 
           try {
-            // SERVER-AUTHORITATIVE: единый RPC валидирует ход, применяет
-            // его в БД, и (если конец) выполняет settlement в той же транзакции.
-            // FALLBACK: если миграция v5 ещё не применена — используем legacy
-            // путь (updateGameState + insertMove). Это обеспечивает zero-downtime
-            // rollout: клиент v1.4.7+ начнёт использовать защищённый путь
-            // автоматически как только пользователь зальёт SQL migration_v5.
-            let serverResult: Awaited<ReturnType<typeof submitMove>> | null = null;
-            try {
-              serverResult = await submitMove(
-                gameId,
-                playerId,
-                gameState.moveNumber,
-                matchingMove,
-              );
-            } catch (rpcErr) {
-              const msg = rpcErr instanceof Error ? rpcErr.message : String(rpcErr);
-              // Миграция ещё не применена → legacy path
-              if (msg.includes("does not exist") || msg.includes("submit_move")) {
-                console.warn("[OnlineGame] submit_move RPC unavailable, falling back to legacy path");
-                serverResult = null;
-              } else {
-                throw rpcErr; // настоящий cheat-reject / NOT_YOUR_TURN / MUST_CAPTURE
-              }
-            }
+            // SERVER-AUTHORITATIVE (v5): submit_move RPC validates the move,
+            // applies it atomically in the DB, and (if game-over) runs
+            // settlement in the same transaction. RLS blocks any direct
+            // UPDATE on games/moves — this is the only legal write path.
+            const serverResult = await submitMove(
+              gameId,
+              playerId,
+              gameState.moveNumber,
+              matchingMove,
+            );
 
-            if (serverResult) {
-              // Reconcile с сервером
-              const serverBoard = serverResult.board;
-              const serverTurn = serverResult.current_turn;
-              const serverMoveNumber = serverResult.move_number;
-              const serverGameOver = serverResult.game_over;
-              const serverWinner = serverResult.winner;
-              const serverReason = serverResult.reason;
+            // Reconcile local state with authoritative server state.
+            const serverBoard = serverResult.board;
+            const serverTurn = serverResult.current_turn;
+            const serverMoveNumber = serverResult.move_number;
+            const serverGameOver = serverResult.game_over;
+            const serverWinner = serverResult.winner;
+            const serverReason = serverResult.reason;
 
-              appliedMoveNumberRef.current = serverMoveNumber;
-              lastSentMoveNumberRef.current = serverMoveNumber;
-              gameOverRef.current = serverGameOver;
+            appliedMoveNumberRef.current = serverMoveNumber;
+            lastSentMoveNumberRef.current = serverMoveNumber;
+            gameOverRef.current = serverGameOver;
 
-              if (serverGameOver) clearActiveGame();
+            if (serverGameOver) clearActiveGame();
 
-              const reconciledLegal = serverGameOver
-                ? []
-                : generateLegalMoves(serverBoard, serverTurn);
-              setGameState((prev) => ({
-                ...prev,
-                board: serverBoard,
-                currentTurn: serverTurn,
-                moveNumber: serverMoveNumber,
-                gameOver: serverGameOver,
-                winner: serverGameOver
-                  ? serverWinner === "white" || serverWinner === "black"
-                    ? serverWinner
-                    : null
-                  : null,
-                winReason: serverGameOver ? serverReason : null,
-                selectedPiece: null,
-                legalMoves: reconciledLegal,
-                captureChain: null,
-              }));
+            const reconciledLegal = serverGameOver
+              ? []
+              : generateLegalMoves(serverBoard, serverTurn);
+            setGameState((prev) => ({
+              ...prev,
+              board: serverBoard,
+              currentTurn: serverTurn,
+              moveNumber: serverMoveNumber,
+              gameOver: serverGameOver,
+              winner: serverGameOver
+                ? serverWinner === "white" || serverWinner === "black"
+                  ? serverWinner
+                  : null
+                : null,
+              winReason: serverGameOver ? serverReason : null,
+              selectedPiece: null,
+              legalMoves: reconciledLegal,
+              captureChain: null,
+            }));
 
-              if (serverGameOver) {
-                play(serverWinner === myColor ? "win" : "lose");
-                if (!finishGameInFlightRef.current) {
-                  finishGameInFlightRef.current = true;
-                  try {
-                    setIsProcessingResult(true);
-                    const stakeResultData = await handleFinishGame(
-                      gameId,
-                      (serverWinner ?? "draw") as "white" | "black" | "draw",
-                      serverReason ?? "",
-                      playerId,
-                    );
-                    if (stakeResultData.result) setStakeResult(stakeResultData.result);
-                  } catch (stakeErr) {
-                    console.error("[OnlineGame] stake result fetch error:", stakeErr);
-                  } finally {
-                    setIsProcessingResult(false);
-                  }
+            if (serverGameOver) {
+              play(serverWinner === myColor ? "win" : "lose");
+              if (!finishGameInFlightRef.current) {
+                finishGameInFlightRef.current = true;
+                try {
+                  setIsProcessingResult(true);
+                  const stakeResultData = await handleFinishGame(
+                    gameId,
+                    (serverWinner ?? "draw") as "white" | "black" | "draw",
+                    serverReason ?? "",
+                    playerId,
+                  );
+                  if (stakeResultData.result) setStakeResult(stakeResultData.result);
+                } catch (stakeErr) {
+                  console.error("[OnlineGame] stake result fetch error:", stakeErr);
+                } finally {
+                  setIsProcessingResult(false);
                 }
               }
-            } else {
-              // LEGACY PATH (migration not yet applied)
-              if (result.over) {
-                clearActiveGame();
-                await updateGameState(
-                  gameId, optimisticBoard, nextTurn, newMoveNumber, myColor,
-                  matchingMove.fromRow, matchingMove.fromCol,
-                  matchingMove.finalRow, matchingMove.finalCol,
-                );
-                play(result.winner === myColor ? "win" : result.winner === "draw" ? "win" : "lose");
-                if (!finishGameInFlightRef.current) {
-                  finishGameInFlightRef.current = true;
-                  try {
-                    setIsProcessingResult(true);
-                    const stakeResultData = await handleFinishGame(
-                      gameId, result.winner as "white" | "black" | "draw",
-                      result.reason, playerId,
-                    );
-                    if (stakeResultData.result) setStakeResult(stakeResultData.result);
-                  } catch (stakeErr) {
-                    console.error("[OnlineGame] processGameResult error:", stakeErr);
-                  } finally {
-                    setIsProcessingResult(false);
-                  }
-                }
-              } else {
-                await updateGameState(
-                  gameId, optimisticBoard, nextTurn, newMoveNumber, myColor,
-                  matchingMove.fromRow, matchingMove.fromCol,
-                  matchingMove.finalRow, matchingMove.finalCol,
-                );
-              }
-              insertMove(gameId, gameState.moveNumber, currentTurn, matchingMove, optimisticBoard, myColor).catch(() => null);
             }
           } catch (syncErr) {
             console.error("[OnlineGame] move rejected:", syncErr);
@@ -614,15 +560,10 @@ export default function OnlineGame() {
     if (finishGameInFlightRef.current) return;
     finishGameInFlightRef.current = true;
     try {
-      try {
-        await submitResign(gameId, playerId, reason);
-      } catch (rpcErr) {
-        const msg = rpcErr instanceof Error ? rpcErr.message : String(rpcErr);
-        if (!msg.includes("does not exist") && !msg.includes("submit_resign")) {
-          throw rpcErr;
-        }
-        // Legacy fallback: миграция v5 не применена — старый путь сам сделает finish
-      }
+      // SERVER-AUTHORITATIVE (v5): submit_resign sets status='finished',
+      // resolves the winner, processes stake settlement and rating updates
+      // atomically. RLS blocks any direct UPDATE on games.
+      await submitResign(gameId, playerId, reason);
       const stakeResultData = await handleFinishGame(gameId, winner, reason, playerId);
       if (stakeResultData.result) setStakeResult(stakeResultData.result);
     } catch (err) {

@@ -32,7 +32,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String GAME_URL = "https://shashki-royale.pages.dev/?apk=146";
+    private static final String GAME_URL = "https://shashki-royale.pages.dev/?apk=147";
 
     private WebView webView;
     private SwipeRefreshLayout refreshLayout;
