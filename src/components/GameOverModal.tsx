@@ -67,7 +67,18 @@ export default function GameOverModal({
     : "#ff6b6b";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/85 backdrop-blur-sm overflow-y-auto"
+      style={{
+        paddingTop: "max(env(safe-area-inset-top, 0px), 16px)",
+        paddingBottom: "max(env(safe-area-inset-bottom, 0px), 16px)",
+        paddingLeft: "max(env(safe-area-inset-left, 0px), 12px)",
+        paddingRight: "max(env(safe-area-inset-right, 0px), 12px)",
+        WebkitOverflowScrolling: "touch",
+        overscrollBehavior: "contain",
+      }}
+      data-testid="game-over-overlay"
+    >
       {/* Confetti */}
       <AnimatePresence>
         {showConfetti &&
@@ -84,10 +95,10 @@ export default function GameOverModal({
       </AnimatePresence>
 
       <motion.div
-        initial={{ scale: 0.8, opacity: 0, y: 30 }}
+        initial={{ scale: 0.85, opacity: 0, y: 24 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 300, damping: 24 }}
-        className="mx-4 p-7 rounded-3xl text-center relative"
+        transition={{ type: "spring", stiffness: 280, damping: 22 }}
+        className="p-6 rounded-3xl text-center relative my-auto w-full"
         style={{
           background: "linear-gradient(160deg, #1a0800 0%, #2d0f00 100%)",
           border: `1px solid ${isVictory ? "rgba(212,175,55,0.5)" : "rgba(200,50,30,0.3)"}`,
@@ -95,8 +106,12 @@ export default function GameOverModal({
             ? "0 0 60px rgba(212,175,55,0.2), 0 20px 60px rgba(0,0,0,0.5)"
             : "0 20px 60px rgba(0,0,0,0.5)",
           maxWidth: 340,
-          width: "100%",
+          maxHeight:
+            "calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px)",
+          overflowY: "auto",
+          boxSizing: "border-box",
         }}
+        data-testid="game-over-modal"
       >
         {/* Icon */}
         <motion.div
@@ -170,6 +185,7 @@ export default function GameOverModal({
           {onRematch && (
             <button
               onClick={onRematch}
+              data-testid="game-over-rematch-btn"
               className="w-full py-3.5 font-bold text-sm cursor-pointer transition-all active:scale-95"
               style={{
                 borderRadius: "12px",
@@ -184,6 +200,7 @@ export default function GameOverModal({
           )}
           <button
             onClick={onHome}
+            data-testid="game-over-home-btn"
             className="w-full py-3.5 font-semibold text-sm cursor-pointer transition-all active:scale-95"
             style={{
               borderRadius: "12px",

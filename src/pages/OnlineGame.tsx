@@ -147,6 +147,10 @@ export default function OnlineGame() {
   const appliedMoveNumberRef = useRef(0);
   const lastOpponentActivityRef = useRef(Date.now());
   const gameOverRef = useRef(false);
+  // Ensures processGameResult RPC is invoked at most once per match instance,
+  // regardless of re-renders / fast taps / rapid realtime echoes. The RPC is
+  // also idempotent server-side, but this avoids unnecessary network calls.
+  const finishGameInFlightRef = useRef(false);
   const lastSentMoveNumberRef = useRef(0);
   // Channel ref for reconnect — typed as the Supabase RealtimeChannel
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -460,24 +464,27 @@ export default function OnlineGame() {
               // 2) Защищённый RPC: ставит status='finished', winner, reason,
               //    проводит расчёт ставки и обновляет рейтинг.
               //    Идемпотентно по escrow_status, безопасно дёргать повторно.
-              try {
-                setIsProcessingResult(true);
-                const stakeResultData = await handleFinishGame(
-                  gameId,
-                  result.winner as "white" | "black" | "draw",
-                  result.reason,
-                  playerId,
-                );
+              if (!finishGameInFlightRef.current) {
+                finishGameInFlightRef.current = true;
+                try {
+                  setIsProcessingResult(true);
+                  const stakeResultData = await handleFinishGame(
+                    gameId,
+                    result.winner as "white" | "black" | "draw",
+                    result.reason,
+                    playerId,
+                  );
 
-                if (stakeResultData.result) {
-                  setStakeResult(stakeResultData.result);
+                  if (stakeResultData.result) {
+                    setStakeResult(stakeResultData.result);
+                  }
+                  // Для не-ставочных игр модалка не нужна — обычный GameOverModal
+                  // покажется автоматически.
+                } catch (stakeErr) {
+                  console.error("[OnlineGame] processGameResult error:", stakeErr);
+                } finally {
+                  setIsProcessingResult(false);
                 }
-                // Для не-ставочных игр модалка не нужна — обычный GameOverModal
-                // покажется автоматически.
-              } catch (stakeErr) {
-                console.error("[OnlineGame] processGameResult error:", stakeErr);
-              } finally {
-                setIsProcessingResult(false);
               }
             } else {
               await updateGameState(
@@ -540,6 +547,8 @@ export default function OnlineGame() {
     play("lose");
     // Защищённый путь: processGameResult сам ставит status='finished',
     // расчёт ставки и обновление рейтинга.
+    if (finishGameInFlightRef.current) return;
+    finishGameInFlightRef.current = true;
     try {
       const stakeResultData = await handleFinishGame(gameId, winner, reason, playerId);
       if (stakeResultData.result) setStakeResult(stakeResultData.result);
@@ -595,6 +604,8 @@ export default function OnlineGame() {
     setOpponentLeft(false);
     setGameState((prev) => ({ ...prev, gameOver: true, winner: myColor, winReason: reason }));
     play("win");
+    if (finishGameInFlightRef.current) return;
+    finishGameInFlightRef.current = true;
     try {
       const stakeResultData = await handleFinishGame(gameId, myColor, reason, playerId);
       if (stakeResultData.result) setStakeResult(stakeResultData.result);
@@ -603,7 +614,33 @@ export default function OnlineGame() {
     }
   };
 
-  const hasMandatory = isMyTurn && !gameState.gameOver && gameState.legalMoves.some((m) => m.isCapture);
+  // Capture hint is shown ONLY to the active player when they actually have
+  // a mandatory capture available on the current board for their own colour.
+  // Hard guards:
+  //   • myColor known (we are a participant, not a spectator);
+  //   • playerId known (anonymous bootstrap completed);
+  //   • game is in 'playing' state (not waiting / not finished);
+  //   • not loading / no sync error pending;
+  //   • currentTurn matches our colour;
+  //   • we got a non-stale state (move number advanced through applyGameRow);
+  //   • the rule engine, evaluated against gameState.board + myColor (not the
+  //     potentially-stale legalMoves array), confirms a capture exists.
+  // This intentionally bypasses gameState.legalMoves because legalMoves may
+  // contain the OPPONENT's moves between a local optimistic state update and
+  // the next realtime echo (multi-capture / fast-update edge case).
+  const isParticipant = Boolean(myColor && playerId);
+  const isGamePlaying =
+    gameStatus === "playing" &&
+    !gameState.gameOver &&
+    !loadError &&
+    appliedMoveNumberRef.current >= gameState.moveNumber - 1;
+  const hasMandatory =
+    isParticipant &&
+    isGamePlaying &&
+    !sending &&
+    myColor !== undefined &&
+    gameState.currentTurn === myColor &&
+    hasMandatoryCapture(gameState.board, myColor);
   const flipped = myColor === "black";
 
   if (loadError) {
@@ -725,6 +762,7 @@ export default function OnlineGame() {
             }}
           />
           <span
+            data-testid="turn-status"
             className="font-semibold text-sm"
             style={{
               fontFamily: "Cinzel, serif",
@@ -754,17 +792,29 @@ export default function OnlineGame() {
               <span className="text-xs" style={{ color: "#FFD700" }}>Противник походил ✓</span>
             </motion.div>
           )}
-          {hasMandatory && !sending && (
+          {hasMandatory && (
             <motion.div
               key="mandatory"
+              data-testid="capture-hint"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="flex items-center gap-2 py-1.5 px-3 rounded-lg"
-              style={{ background: "rgba(220, 50, 0, 0.15)", border: "1px solid rgba(220,80,0,0.3)" }}
+              className="flex items-center gap-2 py-1 px-2.5 rounded-md"
+              style={{
+                background: "rgba(212,175,55,0.10)",
+                border: "1px solid rgba(212,175,55,0.30)",
+              }}
             >
-              <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-              <span className="text-xs text-red-300">Взятие обязательно!</span>
+              <AlertCircle
+                className="w-3.5 h-3.5 flex-shrink-0"
+                style={{ color: "#D4AF37" }}
+              />
+              <span
+                className="text-[11px] leading-tight"
+                style={{ color: "rgba(255,215,0,0.85)" }}
+              >
+                Доступно обязательное взятие
+              </span>
             </motion.div>
           )}
           {connectionLost && (
