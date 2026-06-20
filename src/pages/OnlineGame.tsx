@@ -16,6 +16,7 @@ import {
   insertMove,
   type GameRow,
 } from "../services/gameRooms.ts";
+import { submitMove, submitResign } from "../services/secureMoves.ts";
 import { getOrCreateProfile, type Profile } from "../services/profiles.ts";
 import { cancelStakeGame, getGameStake } from "../services/stakes.ts";
 import { toast } from "sonner";
@@ -406,16 +407,16 @@ export default function OnlineGame() {
           setSending(true);
           setSyncError(null);
 
-          const newBoard = applyMove(board, matchingMove, currentTurn);
+          // Optimistic local apply for instant feedback. Server is authoritative;
+          // we'll reconcile with server's board on response.
+          const optimisticBoard = applyMove(board, matchingMove, currentTurn);
           const nextTurn: PlayerColor = currentTurn === "white" ? "black" : "white";
-          const result = checkGameResult(newBoard, nextTurn);
+          const result = checkGameResult(optimisticBoard, nextTurn);
           const newMoveNumber = gameState.moveNumber + 1;
 
           appliedMoveNumberRef.current = newMoveNumber;
           lastSentMoveNumberRef.current = newMoveNumber;
           gameOverRef.current = result.over;
-
-          if (result.over) clearActiveGame();
 
           setLastMove({
             fromRow: matchingMove.fromRow,
@@ -428,10 +429,10 @@ export default function OnlineGame() {
           else play("move");
           if (matchingMove.promoted) setTimeout(() => play("promote"), 150);
 
-          const nextLegal = result.over ? [] : generateLegalMoves(newBoard, nextTurn);
+          const nextLegal = result.over ? [] : generateLegalMoves(optimisticBoard, nextTurn);
           setGameState((prev) => ({
             ...prev,
-            board: newBoard,
+            board: optimisticBoard,
             currentTurn: nextTurn,
             moveNumber: newMoveNumber,
             gameOver: result.over,
@@ -443,70 +444,135 @@ export default function OnlineGame() {
           }));
 
           try {
-            if (result.over) {
-              // Финализация: ВАЖНО — порядок имеет значение.
-              // 1) Сначала сохраняем финальную позицию (board_state),
-              //    статус игры пока остаётся 'playing'.
-              await updateGameState(
+            // SERVER-AUTHORITATIVE: единый RPC валидирует ход, применяет
+            // его в БД, и (если конец) выполняет settlement в той же транзакции.
+            // FALLBACK: если миграция v5 ещё не применена — используем legacy
+            // путь (updateGameState + insertMove). Это обеспечивает zero-downtime
+            // rollout: клиент v1.4.7+ начнёт использовать защищённый путь
+            // автоматически как только пользователь зальёт SQL migration_v5.
+            let serverResult: Awaited<ReturnType<typeof submitMove>> | null = null;
+            try {
+              serverResult = await submitMove(
                 gameId,
-                newBoard,
-                nextTurn,
-                newMoveNumber,
-                myColor,
-                matchingMove.fromRow,
-                matchingMove.fromCol,
-                matchingMove.finalRow,
-                matchingMove.finalCol,
+                playerId,
+                gameState.moveNumber,
+                matchingMove,
               );
+            } catch (rpcErr) {
+              const msg = rpcErr instanceof Error ? rpcErr.message : String(rpcErr);
+              // Миграция ещё не применена → legacy path
+              if (msg.includes("does not exist") || msg.includes("submit_move")) {
+                console.warn("[OnlineGame] submit_move RPC unavailable, falling back to legacy path");
+                serverResult = null;
+              } else {
+                throw rpcErr; // настоящий cheat-reject / NOT_YOUR_TURN / MUST_CAPTURE
+              }
+            }
 
-              play(result.winner === myColor ? "win" : result.winner === "draw" ? "win" : "lose");
+            if (serverResult) {
+              // Reconcile с сервером
+              const serverBoard = serverResult.board;
+              const serverTurn = serverResult.current_turn;
+              const serverMoveNumber = serverResult.move_number;
+              const serverGameOver = serverResult.game_over;
+              const serverWinner = serverResult.winner;
+              const serverReason = serverResult.reason;
 
-              // 2) Защищённый RPC: ставит status='finished', winner, reason,
-              //    проводит расчёт ставки и обновляет рейтинг.
-              //    Идемпотентно по escrow_status, безопасно дёргать повторно.
-              if (!finishGameInFlightRef.current) {
-                finishGameInFlightRef.current = true;
-                try {
-                  setIsProcessingResult(true);
-                  const stakeResultData = await handleFinishGame(
-                    gameId,
-                    result.winner as "white" | "black" | "draw",
-                    result.reason,
-                    playerId,
-                  );
+              appliedMoveNumberRef.current = serverMoveNumber;
+              lastSentMoveNumberRef.current = serverMoveNumber;
+              gameOverRef.current = serverGameOver;
 
-                  if (stakeResultData.result) {
-                    setStakeResult(stakeResultData.result);
+              if (serverGameOver) clearActiveGame();
+
+              const reconciledLegal = serverGameOver
+                ? []
+                : generateLegalMoves(serverBoard, serverTurn);
+              setGameState((prev) => ({
+                ...prev,
+                board: serverBoard,
+                currentTurn: serverTurn,
+                moveNumber: serverMoveNumber,
+                gameOver: serverGameOver,
+                winner: serverGameOver
+                  ? serverWinner === "white" || serverWinner === "black"
+                    ? serverWinner
+                    : null
+                  : null,
+                winReason: serverGameOver ? serverReason : null,
+                selectedPiece: null,
+                legalMoves: reconciledLegal,
+                captureChain: null,
+              }));
+
+              if (serverGameOver) {
+                play(serverWinner === myColor ? "win" : "lose");
+                if (!finishGameInFlightRef.current) {
+                  finishGameInFlightRef.current = true;
+                  try {
+                    setIsProcessingResult(true);
+                    const stakeResultData = await handleFinishGame(
+                      gameId,
+                      (serverWinner ?? "draw") as "white" | "black" | "draw",
+                      serverReason ?? "",
+                      playerId,
+                    );
+                    if (stakeResultData.result) setStakeResult(stakeResultData.result);
+                  } catch (stakeErr) {
+                    console.error("[OnlineGame] stake result fetch error:", stakeErr);
+                  } finally {
+                    setIsProcessingResult(false);
                   }
-                  // Для не-ставочных игр модалка не нужна — обычный GameOverModal
-                  // покажется автоматически.
-                } catch (stakeErr) {
-                  console.error("[OnlineGame] processGameResult error:", stakeErr);
-                } finally {
-                  setIsProcessingResult(false);
                 }
               }
             } else {
-              await updateGameState(
-                gameId,
-                newBoard,
-                nextTurn,
-                newMoveNumber,
-                myColor,
-                matchingMove.fromRow,
-                matchingMove.fromCol,
-                matchingMove.finalRow,
-                matchingMove.finalCol,
-              );
+              // LEGACY PATH (migration not yet applied)
+              if (result.over) {
+                clearActiveGame();
+                await updateGameState(
+                  gameId, optimisticBoard, nextTurn, newMoveNumber, myColor,
+                  matchingMove.fromRow, matchingMove.fromCol,
+                  matchingMove.finalRow, matchingMove.finalCol,
+                );
+                play(result.winner === myColor ? "win" : result.winner === "draw" ? "win" : "lose");
+                if (!finishGameInFlightRef.current) {
+                  finishGameInFlightRef.current = true;
+                  try {
+                    setIsProcessingResult(true);
+                    const stakeResultData = await handleFinishGame(
+                      gameId, result.winner as "white" | "black" | "draw",
+                      result.reason, playerId,
+                    );
+                    if (stakeResultData.result) setStakeResult(stakeResultData.result);
+                  } catch (stakeErr) {
+                    console.error("[OnlineGame] processGameResult error:", stakeErr);
+                  } finally {
+                    setIsProcessingResult(false);
+                  }
+                }
+              } else {
+                await updateGameState(
+                  gameId, optimisticBoard, nextTurn, newMoveNumber, myColor,
+                  matchingMove.fromRow, matchingMove.fromCol,
+                  matchingMove.finalRow, matchingMove.finalCol,
+                );
+              }
+              insertMove(gameId, gameState.moveNumber, currentTurn, matchingMove, optimisticBoard, myColor).catch(() => null);
             }
-            insertMove(gameId, gameState.moveNumber, currentTurn, matchingMove, newBoard, myColor).catch(() => null);
           } catch (syncErr) {
-            console.error("[OnlineGame] Sync error, rolling back:", syncErr);
-            // ОТКАТ: восстанавливаем предыдущий стейт
+            console.error("[OnlineGame] move rejected:", syncErr);
             setGameState(gameState);
             appliedMoveNumberRef.current = gameState.moveNumber;
             gameOverRef.current = false;
-            setSyncError("Ошибка сети — ход не отправлен. Попробуйте ещё раз.");
+            const msg = syncErr instanceof Error ? syncErr.message : "Ошибка";
+            setSyncError(
+              msg.includes("STALE_MOVE_NUMBER")
+                ? "Игра рассинхронизирована. Обновите страницу."
+                : msg.includes("NOT_YOUR_TURN")
+                ? "Сейчас ход соперника."
+                : msg.includes("MUST_CAPTURE")
+                ? "Доступно обязательное взятие."
+                : `Ход отвергнут: ${msg}`,
+            );
           } finally {
             setSending(false);
           }
@@ -545,11 +611,18 @@ export default function OnlineGame() {
     clearActiveGame();
     setGameState((prev) => ({ ...prev, gameOver: true, winner, winReason: reason }));
     play("lose");
-    // Защищённый путь: processGameResult сам ставит status='finished',
-    // расчёт ставки и обновление рейтинга.
     if (finishGameInFlightRef.current) return;
     finishGameInFlightRef.current = true;
     try {
+      try {
+        await submitResign(gameId, playerId, reason);
+      } catch (rpcErr) {
+        const msg = rpcErr instanceof Error ? rpcErr.message : String(rpcErr);
+        if (!msg.includes("does not exist") && !msg.includes("submit_resign")) {
+          throw rpcErr;
+        }
+        // Legacy fallback: миграция v5 не применена — старый путь сам сделает finish
+      }
       const stakeResultData = await handleFinishGame(gameId, winner, reason, playerId);
       if (stakeResultData.result) setStakeResult(stakeResultData.result);
     } catch (err) {

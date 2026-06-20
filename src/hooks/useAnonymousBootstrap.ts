@@ -3,15 +3,23 @@ import { getOrCreatePlayerId } from "../lib/storage";
 import { getOrCreateProfile } from "../services/profiles";
 import { supabaseConfigured } from "../lib/supabase";
 import { invalidateProfileCache } from "./use-profile";
+import {
+  claimWelcomeBonus,
+  computeDeviceFingerprint,
+} from "../services/secureMoves";
+
+const FP_STORAGE_KEY = "sr_device_fp_v1";
+const BONUS_CLAIMED_KEY = "sr_welcome_claimed_v1";
 
 /**
- * Ensure every visitor has an anonymous player_id + Supabase profile + wallet
- * BEFORE they tap any "Play" button. Runs once on app mount.
- *
- * - Idempotent: server-side `get_or_create_profile` only grants welcome bonus
- *   the first time a player_id is seen.
- * - Silent: errors are logged but don't block the UI — the home screen still
- *   renders and `useProfile` will retry on demand.
+ * Bootstrap анонимного игрока:
+ *  1. Создаёт/получает player_id (UUID в localStorage).
+ *  2. Создаёт профиль + кошелёк через защищённый RPC.
+ *  3. Вычисляет device fingerprint (canvas + UA + screen + timezone).
+ *  4. Atomic-claim welcome bonus с anti-farm защитой:
+ *     • один welcome bonus на профиль (server-side check);
+ *     • один welcome bonus на device fingerprint;
+ *     • максимум 3 профиля с одного fp.
  */
 export function useAnonymousBootstrap(): void {
   const startedRef = useRef(false);
@@ -19,17 +27,31 @@ export function useAnonymousBootstrap(): void {
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-
     if (!supabaseConfigured) return;
 
     const run = async () => {
       try {
         const playerId = getOrCreatePlayerId();
         await getOrCreateProfile(playerId);
-        // Invalidate so useProfile picks up the fresh wallet on next render
+
+        // Welcome bonus claim только если не пытались ранее (защита от спама RPC)
+        if (!localStorage.getItem(BONUS_CLAIMED_KEY)) {
+          try {
+            let fp = localStorage.getItem(FP_STORAGE_KEY);
+            if (!fp) {
+              fp = await computeDeviceFingerprint();
+              localStorage.setItem(FP_STORAGE_KEY, fp);
+            }
+            await claimWelcomeBonus(playerId, fp, 100);
+            localStorage.setItem(BONUS_CLAIMED_KEY, "1");
+          } catch (bonusErr) {
+            // eslint-disable-next-line no-console
+            console.warn("[useAnonymousBootstrap] welcome bonus claim failed:", bonusErr);
+          }
+        }
+
         invalidateProfileCache();
       } catch (err) {
-        // Don't crash the app; log for diagnostics.
         // eslint-disable-next-line no-console
         console.warn("[useAnonymousBootstrap] profile bootstrap failed:", err);
       }
