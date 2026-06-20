@@ -69,20 +69,20 @@ jobs:
         run: |
           mkdir -p release
           cp android/app/build/outputs/apk/release/app-release.apk \
-             release/shashki-royale-v1.4.7-release.apk
+             release/shashki-royale-v1.4.8-release.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk \
-             release/shashki-royale-v1.4.7-debug.apk
+             release/shashki-royale-v1.4.8-debug.apk
           ls -la release/
 
       - name: APK signature verify
         run: |
           BT=$(ls -d $ANDROID_HOME/build-tools/* | sort | tail -1)
           echo "=== apksigner verify (release) ==="
-          "$BT/apksigner" verify --verbose --print-certs release/shashki-royale-v1.4.7-release.apk \
+          "$BT/apksigner" verify --verbose --print-certs release/shashki-royale-v1.4.8-release.apk \
             | tee release/APK_VERIFICATION.txt
           echo ""
           echo "=== apksigner verify (debug) ==="
-          "$BT/apksigner" verify --verbose --print-certs release/shashki-royale-v1.4.7-debug.apk \
+          "$BT/apksigner" verify --verbose --print-certs release/shashki-royale-v1.4.8-debug.apk \
             | tee -a release/APK_VERIFICATION.txt
 
       - name: APK metadata + permissions + contents
@@ -90,13 +90,13 @@ jobs:
           BT=$(ls -d $ANDROID_HOME/build-tools/* | sort | tail -1)
           {
             echo "=== aapt dump badging (release) ==="
-            "$BT/aapt" dump badging release/shashki-royale-v1.4.7-release.apk
+            "$BT/aapt" dump badging release/shashki-royale-v1.4.8-release.apk
             echo ""
             echo "=== aapt dump permissions (release) ==="
-            "$BT/aapt" dump permissions release/shashki-royale-v1.4.7-release.apk
+            "$BT/aapt" dump permissions release/shashki-royale-v1.4.8-release.apk
             echo ""
             echo "=== unzip -l (release) ==="
-            unzip -l release/shashki-royale-v1.4.7-release.apk | head -120
+            unzip -l release/shashki-royale-v1.4.8-release.apk | head -120
           } > release/APK_CONTENTS.txt
           cat release/APK_CONTENTS.txt
           echo ""
@@ -110,12 +110,12 @@ jobs:
             "appName": "Шашки Рояль",
             "productionUrl": "https://shashki-royale.pages.dev/",
             "packageId": "com.shashkiroyale.app",
-            "versionName": "1.4.7",
-            "versionCode": 147,
+            "versionName": "1.4.8",
+            "versionCode": 148,
             "buildType": "Native Android WebView release APK",
             "requiresChrome": false,
-            "mainApk": "release/shashki-royale-v1.4.7-release.apk",
-            "debugApk": "release/shashki-royale-v1.4.7-debug.apk",
+            "mainApk": "release/shashki-royale-v1.4.8-release.apk",
+            "debugApk": "release/shashki-royale-v1.4.8-debug.apk",
             "buildDate": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "gitCommit": "${{ github.sha }}",
             "ciRun": "${{ github.run_id }}"
@@ -126,7 +126,7 @@ jobs:
       - name: Install report (no device)
         run: |
           cat > release/ANDROID_INSTALL_REPORT.md <<'EOF'
-          # Android Install Report — v1.4.7
+          # Android Install Report — v1.4.8
 
           ## adb install test
           **Not executed**: GitHub Actions ubuntu-latest runners do not have a
@@ -141,7 +141,7 @@ jobs:
           - Build was a clean `gradle clean assembleRelease assembleDebug`
 
           ## Recommended human acceptance test on a real Android phone
-          1. Download `shashki-royale-v1.4.7-release.apk` to the phone
+          1. Download `shashki-royale-v1.4.8-release.apk` to the phone
           2. Open the file → "Install"; allow unknown sources if prompted
           3. Launch "Шашки Рояль" from the launcher
           4. Verify the home screen shows: profile, **100 Coin**, QuickStakeBar
@@ -154,7 +154,7 @@ jobs:
       - name: Upload artifacts (raw)
         uses: actions/upload-artifact@v4
         with:
-          name: shashki-royale-v1.4.7-apk
+          name: shashki-royale-v1.4.8-apk
           path: release/
           retention-days: 90
 
@@ -166,9 +166,9 @@ jobs:
           cp android/build.gradle android-webview-wrapper/project-build.gradle
           cp android/gradle.properties android-webview-wrapper/
           cp android/settings.gradle android-webview-wrapper/
-          zip -r release/shashki-royale-v1.4.7-final-release.zip \
-            release/shashki-royale-v1.4.7-release.apk \
-            release/shashki-royale-v1.4.7-debug.apk \
+          zip -r release/shashki-royale-v1.4.8-final-release.zip \
+            release/shashki-royale-v1.4.8-release.apk \
+            release/shashki-royale-v1.4.8-debug.apk \
             release/APK_VERIFICATION.txt \
             release/APK_CONTENTS.txt \
             release/build-info.json \
@@ -177,80 +177,84 @@ jobs:
             -x "release/*.zip"
           ls -la release/
 
-      - name: Create GitHub Release v1.4.7
+      - name: Create GitHub Release v1.4.8
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.4.7
-          name: Шашки Рояль v1.4.7 — server-authoritative security hardening
+          tag_name: v1.4.8
+          name: Шашки Рояль v1.4.8 — engagement features (streak, daily challenge, referrals)
           body: |
-            ## Release v1.4.7 — security hardening (server-authoritative move engine)
+            ## Release v1.4.8 — engagement без сжигания экономики
 
-            **Главное изменение:** все денежные / игровые операции уехали на сервер.
-            Клиент больше не может писать в таблицы `games` / `moves` напрямую — RLS блокирует.
-            Единственный легальный путь хода — RPC `submit_move` (`SECURITY DEFINER`).
+            **Главная фишка:** добавлены 4 retention-фичи, спроектированные под
+            будущую экономику **1 Coin = 1$**. Все награды минимальные или
+            cosmetic — экономика защищена.
 
-            **Что внутри SQL-миграции v5 (`supabase/migration_v5_secure_moves.sql`):**
-            - `submit_move(game_id, player_id, expected_move_number, jumps)` —
-              атомарный RPC: валидирует, что caller-участник, сейчас его ход,
-              ходы соответствуют правилам русских шашек (MUST_CAPTURE,
-              CHAIN_MUST_CONTINUE, king promotion, capture across distance,
-              backward man rejected). При game-over вызывает `process_game_result`
-              в той же транзакции.
-            - `submit_resign`, `claim_timeout_win` (>90s неактивности соперника),
-              `cancel_waiting_room`, `claim_welcome_bonus` — всё через
-              `SECURITY DEFINER`.
-            - **RLS lockdown:** прямой `UPDATE`/`DELETE` на `games` и
-              `INSERT`/`UPDATE`/`DELETE` на `moves` запрещены (нет policy).
-              `wallets` — read/write только владельцем.
-            - **Anti-farm welcome bonus:** один claim на профиль + один на
-              device-fingerprint, максимум 3 профиля на fp.
-            - **Rate limit:** max 10 созданий игр / 60 секунд на player_id.
-            - Колонки `last_move_at`, `last_from_*`, `last_to_*` для UI и
-              timeout finalizer.
+            **Что внутри SQL-миграции v6 (`supabase/migration_v6_engagement.sql`):**
+            *(требует ручного применения через Supabase Dashboard SQL Editor)*
+            - Новые колонки на `profiles`: `win_streak`, `best_win_streak`,
+              `daily_challenge_wins`, `daily_challenge_date`, `referrer_id`,
+              `referred_games_played`, `referral_paid`.
+            - RPC `update_engagement_after_game(player_id, game_id, won, is_draw)`
+              — атомарно обновляет win streak + daily challenge counter.
+              Идемпотентно по (game_id, player_id) через таблицу `engagement_log`.
+            - RPC `register_referral(player_id, referrer_id)` — связывает
+              нового юзера с пригласившим (один раз, не self, только если
+              referrer существует).
+            - RPC `claim_referral_payout(player_id)` — выплачивает **1 Coin**
+              пригласившему **после того, как приглашённый сыграл ≥3 партии**.
+              Идемпотентно через `referral_paid` флаг. Размер бонуса осознанно
+              минимальный (1 Coin = $1) — UAC под контролем.
 
-            **Клиент v1.4.7:**
-            - `src/services/secureMoves.ts` — wrappers для `submit_move`,
-              `submit_resign`, `claim_timeout_win`, `cancel_waiting_room`,
-              `claim_welcome_bonus`, SHA-256 device fingerprint.
-            - `src/pages/OnlineGame.tsx` — единственный путь хода через
-              `submit_move`. Legacy fallback (`updateGameState`/`insertMove`)
-              **полностью удалён**.
-            - `src/hooks/useAnonymousBootstrap.ts` — welcome bonus через
-              защищённый `claim_welcome_bonus` RPC с device fp.
-            - `src/services/gameRooms.ts` — `updateGameState`, `finishGame`,
-              `insertMove` удалены (больше нигде не используются).
+            **Что нового на клиенте v1.4.8:**
+            - 🔥 **Win Streak Badge** — счётчик серии побед видим сопернику в
+              матчмейкинге (на `PlayerCard`). Психологический хук «не хочу
+              терять серию».
+            - 📅 **Daily Login Streak** — счётчик дней подряд (полностью
+              localStorage, **ноль нагрузки на БД** и ноль расходов экономики).
+              Только prestige.
+            - 🎯 **Daily Challenge** — «Выиграй 3 партии сегодня → титул
+              "Чемпион дня"». Только cosmetic, без Coin-награды.
+            - 🤝 **Referral Program** — приглашай друзей по ссылке
+              `?ref=<player_id>`. Когда друг сыграет 3 партии — пригласившему
+              автоматически +1 Coin. UAC ≈ $1 за активного юзера, что
+              в 10–20× дешевле платной рекламы.
+            - 🔗 **Share Win** — кнопка «🏆 Поделиться победой» на экране
+              окончания партии. Использует Web Share API (native dialog в
+              мобильном браузере / WebView), fallback — копирование в буфер.
+              Share-текст содержит `?ref=` ссылку → автомагический вирусный
+              рост.
+            - 🔁 **Rematch** — кнопка «Сыграть снова» на экране окончания
+              онлайн-партии (раньше была только в LocalGame).
+            - 📊 **EngagementStrip** на главной — компактный блок 3-в-1:
+              серия побед / дней в игре / прогресс челленджа. Появляется
+              только если есть что показать (не загромождает UI новичкам).
 
             **Сохранено без изменений:**
-            - Coin economy, QuickMatch, ставки 1v1/2v2/5x5, ELO, welcome bonus
-              (поведение то же — но теперь atomic и anti-farm).
-            - Правка из v1.4.5/v1.4.6: компактный золотой хинт «Доступно
-              обязательное взятие» (нет красного баннера на ходе соперника).
-            - Скроллируемый `GameResultModal` со sticky CTA — кнопка «На
-              главный экран» всегда видна на 360×640.
+            - v1.4.7 security: server-authoritative `submit_move`, RLS lockdown,
+              anti-farm welcome bonus.
+            - Coin economy, QuickMatch, ставки 1v1/2v2/5x5, ELO.
+            - UX из v1.4.5/v1.4.6: компактный capture hint, scrollable
+              game-over modal с sticky CTA.
 
             **Что внутри архива:**
-            - `shashki-royale-v1.4.7-release.apk` — production-signed, debuggable=false
-            - `shashki-royale-v1.4.7-debug.apk` — для диагностики, applicationId с суффиксом `.debug`
-            - `shashki-royale-v1.4.7-final-release.zip` — полный архив с верификацией и handoff
+            - `shashki-royale-v1.4.8-release.apk` — production-signed
+            - `shashki-royale-v1.4.8-debug.apk` — для диагностики
+            - `shashki-royale-v1.4.8-final-release.zip` — полный архив
 
             **Параметры APK:**
             - packageId: `com.shashkiroyale.app`
-            - versionName: `1.4.7` / versionCode: `147`
+            - versionName: `1.4.8` / versionCode: `148`
             - minSdk 21, targetSdk 34
             - Native Android WebView (NOT TWA)
-            - Загружает https://shashki-royale.pages.dev/?apk=147
-            - Включены: JavaScript, DOM storage, localStorage, cookies, third-party cookies
-            - Offline-экран на русском с кнопкой «Повторить»
-            - Edge-to-edge, status/nav bar #1A0800, portrait
-            - Adaptive launcher icon + PNG mipmap во всех 5 плотностях
+            - Загружает https://shashki-royale.pages.dev/?apk=148
             - Подпись v1 (JAR) + v2 (APK Signature Scheme v2)
 
             Coin — внутренняя игровая валюта без денежной стоимости.
           files: |
-            release/shashki-royale-v1.4.7-release.apk
-            release/shashki-royale-v1.4.7-debug.apk
-            release/shashki-royale-v1.4.7-final-release.zip
+            release/shashki-royale-v1.4.8-release.apk
+            release/shashki-royale-v1.4.8-debug.apk
+            release/shashki-royale-v1.4.8-final-release.zip
             release/APK_VERIFICATION.txt
             release/APK_CONTENTS.txt
             release/build-info.json

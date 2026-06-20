@@ -12,6 +12,13 @@ export type Profile = {
   wins: number;
   losses: number;
   draws: number;
+  win_streak?: number;
+  best_win_streak?: number;
+  referrer_id?: string | null;
+  referral_paid?: boolean;
+  referred_games_played?: number;
+  daily_challenge_wins?: number;
+  daily_challenge_date?: string | null;
   created_at: string;
   updated_at: string;
   last_seen_at: string;

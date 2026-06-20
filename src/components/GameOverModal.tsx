@@ -9,6 +9,8 @@ type GameOverModalProps = {
   onHome: () => void;
   onRematch?: () => void;
   moveCount?: number;
+  shareEnabled?: boolean;
+  playerId?: string;
 };
 
 // Simple confetti particle
@@ -32,9 +34,12 @@ export default function GameOverModal({
   onHome,
   onRematch,
   moveCount,
+  shareEnabled,
+  playerId,
 }: GameOverModalProps) {
   const [particles] = useState(() => generateParticles(20));
   const [showConfetti, setShowConfetti] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   const isMyWin = myColor !== null && winner === myColor;
   const isDraw = winner === "draw";
@@ -49,6 +54,25 @@ export default function GameOverModal({
       return () => clearTimeout(t);
     }
   }, [isVictory, isDraw]);
+
+  const handleShare = async () => {
+    const refSuffix = playerId ? `?ref=${encodeURIComponent(playerId)}` : "";
+    const shareUrl = `https://shashki-royale.pages.dev/${refSuffix}`;
+    const shareText = isMyWin
+      ? `🏆 Я выиграл партию в Шашки Рояль! Сыграй со мной: ${shareUrl}`
+      : `♟ Играю в Шашки Рояль — присоединяйся: ${shareUrl}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Шашки Рояль", text: shareText, url: shareUrl });
+      } else {
+        await navigator.clipboard.writeText(shareText);
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2000);
+      }
+    } catch {
+      /* user cancelled */
+    }
+  };
 
   const titleText = isDraw
     ? "Ничья"
@@ -196,6 +220,22 @@ export default function GameOverModal({
               }}
             >
               Сыграть снова
+            </button>
+          )}
+          {shareEnabled && (
+            <button
+              onClick={handleShare}
+              data-testid="game-over-share-btn"
+              className="w-full py-3 font-semibold text-sm cursor-pointer transition-all active:scale-95"
+              style={{
+                borderRadius: "12px",
+                background: "rgba(76,175,80,0.12)",
+                border: "1px solid rgba(76,175,80,0.4)",
+                color: "#7ed87e",
+                fontFamily: "Cinzel, serif",
+              }}
+            >
+              {shareCopied ? "✓ Скопировано в буфер" : isMyWin ? "🏆 Поделиться победой" : "♟ Поделиться игрой"}
             </button>
           )}
           <button

@@ -1054,6 +1054,9 @@ export default function OnlineGame() {
           reason={gameState.winReason}
           myColor={myColor ?? null}
           onHome={() => { clearActiveGame(); navigate("/"); }}
+          onRematch={() => { clearActiveGame(); navigate("/"); }}
+          shareEnabled
+          playerId={playerId}
           moveCount={gameState.moveNumber}
         />
       )}

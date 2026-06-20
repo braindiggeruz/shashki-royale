@@ -21,6 +21,7 @@ export default function PlayerCard({
   const avatarIndex = profile?.avatar_index ?? 0;
   const symbolAvatar = AVATARS[avatarIndex % AVATARS.length];
   const rating = profile?.rating ?? 0;
+  const winStreak = profile?.win_streak ?? 0;
 
   const isWhite = color === "white";
   const bgColor = isWhite
@@ -94,12 +95,30 @@ export default function PlayerCard({
         >
           {displayName}
         </p>
-        <p
-          className="text-xs"
-          style={{ color: "rgba(212,175,55,0.6)" }}
-        >
-          Рейтинг: {rating}
-        </p>
+        <div className="flex items-center gap-2">
+          <p
+            className="text-xs"
+            style={{ color: "rgba(212,175,55,0.6)" }}
+          >
+            Рейтинг: {rating}
+          </p>
+          {winStreak >= 2 && (
+            <span
+              data-testid="win-streak-badge"
+              className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+              style={{
+                background: "rgba(255,80,0,0.18)",
+                border: "1px solid rgba(255,140,0,0.45)",
+                color: "#ffb347",
+                fontFamily: "Cinzel, serif",
+                lineHeight: 1,
+              }}
+              title={`Серия побед: ${winStreak}`}
+            >
+              🔥 {winStreak}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Timer (if provided) */}

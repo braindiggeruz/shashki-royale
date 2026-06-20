@@ -2,6 +2,8 @@ import { useCallback } from "react";
 import { getGameStake } from "../services/stakes";
 import { processGameResult } from "../services/profiles";
 import { fetchGame } from "../services/gameRooms";
+import { updateEngagementAfterGame, claimReferralPayout } from "../services/engagement";
+import { invalidateProfileCache } from "./use-profile";
 import type { GameResult } from "../components/GameResultModal";
 
 /**
@@ -40,6 +42,20 @@ export function useGameResult() {
           finishReason,
           callerPlayerId,
         );
+
+        // 2.5) Engagement update (win streak, daily challenge, ref payout).
+        //      Не критично для финализации — ошибки не прокидываем.
+        try {
+          const won = winnerPlayerId === callerPlayerId;
+          const isDraw = winner === "draw";
+          await updateEngagementAfterGame(callerPlayerId, gameId, won, isDraw);
+          // Дёрнем referral payout — server сам решит платить или нет.
+          await claimReferralPayout(callerPlayerId).catch(() => null);
+          // Сбросить кэш профиля, чтобы UI подхватил свежий win_streak / wallet.
+          invalidateProfileCache();
+        } catch {
+          /* engagement is best-effort */
+        }
 
         // 3) Только если у партии была ставка — собираем результат для модалки.
         const stake = await getGameStake(gameId);

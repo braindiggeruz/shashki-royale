@@ -7,9 +7,11 @@ import {
   claimWelcomeBonus,
   computeDeviceFingerprint,
 } from "../services/secureMoves";
+import { registerReferral, recordDailyLogin } from "../services/engagement";
 
 const FP_STORAGE_KEY = "sr_device_fp_v1";
 const BONUS_CLAIMED_KEY = "sr_welcome_claimed_v1";
+const REF_PROCESSED_KEY = "sr_ref_processed_v1";
 
 /**
  * Bootstrap анонимного игрока:
@@ -33,6 +35,25 @@ export function useAnonymousBootstrap(): void {
       try {
         const playerId = getOrCreatePlayerId();
         await getOrCreateProfile(playerId);
+
+        // Daily login streak — pure local, бесплатно
+        recordDailyLogin();
+
+        // Реферальная связь — если пришли по ?ref=<player_id> и связь
+        // ещё не зарегистрирована для этого устройства
+        if (!localStorage.getItem(REF_PROCESSED_KEY)) {
+          try {
+            const params = new URLSearchParams(window.location.search);
+            const referrerId = params.get("ref");
+            if (referrerId && referrerId !== playerId) {
+              await registerReferral(playerId, referrerId);
+            }
+          } catch (refErr) {
+            // eslint-disable-next-line no-console
+            console.warn("[useAnonymousBootstrap] referral register failed:", refErr);
+          }
+          localStorage.setItem(REF_PROCESSED_KEY, "1");
+        }
 
         // Welcome bonus claim только если не пытались ранее (защита от спама RPC)
         if (!localStorage.getItem(BONUS_CLAIMED_KEY)) {

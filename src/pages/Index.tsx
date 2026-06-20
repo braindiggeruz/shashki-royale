@@ -11,6 +11,7 @@ import { fetchGame } from "../services/gameRooms.ts";
 import { supabaseConfigured } from "../lib/supabase.ts";
 import { useProfile } from "../hooks/use-profile.ts";
 import { WalletDisplay } from "../components/WalletDisplay.tsx";
+import EngagementStrip from "../components/EngagementStrip.tsx";
 
 const SOUND_KEY = "shashki_sound_enabled";
 
@@ -278,6 +279,9 @@ export default function Index() {
           {t("playOnline")}
         </PrimaryButton>
       </motion.div>
+
+      {/* Engagement strip — streak/daily/challenge (cosmetic only, 0 Coin cost) */}
+      <EngagementStrip />
 
       {/* Quick Match (Coin) */}
       {supabaseConfigured && <QuickStakeBar />}
