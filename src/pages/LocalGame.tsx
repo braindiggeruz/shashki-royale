@@ -190,14 +190,26 @@ export default function LocalGame() {
         <AnimatePresence>
           {hasMandatory && (
             <motion.div
+              data-testid="capture-hint"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="mt-2 flex items-center gap-2 py-1.5 px-3 rounded-lg"
-              style={{ background: "rgba(220, 50, 0, 0.15)", border: "1px solid rgba(220,80,0,0.3)" }}
+              className="mt-2 flex items-center gap-2 py-1 px-2.5 rounded-md"
+              style={{
+                background: "rgba(212,175,55,0.10)",
+                border: "1px solid rgba(212,175,55,0.30)",
+              }}
             >
-              <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-              <span className="text-xs text-red-300">Взятие обязательно!</span>
+              <AlertCircle
+                className="w-3.5 h-3.5 flex-shrink-0"
+                style={{ color: "#D4AF37" }}
+              />
+              <span
+                className="text-[11px] leading-tight"
+                style={{ color: "rgba(255,215,0,0.85)" }}
+              >
+                Доступно обязательное взятие
+              </span>
             </motion.div>
           )}
         </AnimatePresence>

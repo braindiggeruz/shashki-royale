@@ -69,20 +69,20 @@ jobs:
         run: |
           mkdir -p release
           cp android/app/build/outputs/apk/release/app-release.apk \
-             release/shashki-royale-v1.4.5-release.apk
+             release/shashki-royale-v1.4.6-release.apk
           cp android/app/build/outputs/apk/debug/app-debug.apk \
-             release/shashki-royale-v1.4.5-debug.apk
+             release/shashki-royale-v1.4.6-debug.apk
           ls -la release/
 
       - name: APK signature verify
         run: |
           BT=$(ls -d $ANDROID_HOME/build-tools/* | sort | tail -1)
           echo "=== apksigner verify (release) ==="
-          "$BT/apksigner" verify --verbose --print-certs release/shashki-royale-v1.4.5-release.apk \
+          "$BT/apksigner" verify --verbose --print-certs release/shashki-royale-v1.4.6-release.apk \
             | tee release/APK_VERIFICATION.txt
           echo ""
           echo "=== apksigner verify (debug) ==="
-          "$BT/apksigner" verify --verbose --print-certs release/shashki-royale-v1.4.5-debug.apk \
+          "$BT/apksigner" verify --verbose --print-certs release/shashki-royale-v1.4.6-debug.apk \
             | tee -a release/APK_VERIFICATION.txt
 
       - name: APK metadata + permissions + contents
@@ -90,13 +90,13 @@ jobs:
           BT=$(ls -d $ANDROID_HOME/build-tools/* | sort | tail -1)
           {
             echo "=== aapt dump badging (release) ==="
-            "$BT/aapt" dump badging release/shashki-royale-v1.4.5-release.apk
+            "$BT/aapt" dump badging release/shashki-royale-v1.4.6-release.apk
             echo ""
             echo "=== aapt dump permissions (release) ==="
-            "$BT/aapt" dump permissions release/shashki-royale-v1.4.5-release.apk
+            "$BT/aapt" dump permissions release/shashki-royale-v1.4.6-release.apk
             echo ""
             echo "=== unzip -l (release) ==="
-            unzip -l release/shashki-royale-v1.4.5-release.apk | head -120
+            unzip -l release/shashki-royale-v1.4.6-release.apk | head -120
           } > release/APK_CONTENTS.txt
           cat release/APK_CONTENTS.txt
           echo ""
@@ -110,12 +110,12 @@ jobs:
             "appName": "Шашки Рояль",
             "productionUrl": "https://shashki-royale.pages.dev/",
             "packageId": "com.shashkiroyale.app",
-            "versionName": "1.4.5",
-            "versionCode": 145,
+            "versionName": "1.4.6",
+            "versionCode": 146,
             "buildType": "Native Android WebView release APK",
             "requiresChrome": false,
-            "mainApk": "release/shashki-royale-v1.4.5-release.apk",
-            "debugApk": "release/shashki-royale-v1.4.5-debug.apk",
+            "mainApk": "release/shashki-royale-v1.4.6-release.apk",
+            "debugApk": "release/shashki-royale-v1.4.6-debug.apk",
             "buildDate": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "gitCommit": "${{ github.sha }}",
             "ciRun": "${{ github.run_id }}"
@@ -126,7 +126,7 @@ jobs:
       - name: Install report (no device)
         run: |
           cat > release/ANDROID_INSTALL_REPORT.md <<'EOF'
-          # Android Install Report — v1.4.5
+          # Android Install Report — v1.4.6
 
           ## adb install test
           **Not executed**: GitHub Actions ubuntu-latest runners do not have a
@@ -141,7 +141,7 @@ jobs:
           - Build was a clean `gradle clean assembleRelease assembleDebug`
 
           ## Recommended human acceptance test on a real Android phone
-          1. Download `shashki-royale-v1.4.5-release.apk` to the phone
+          1. Download `shashki-royale-v1.4.6-release.apk` to the phone
           2. Open the file → "Install"; allow unknown sources if prompted
           3. Launch "Шашки Рояль" from the launcher
           4. Verify the home screen shows: profile, **100 Coin**, QuickStakeBar
@@ -154,7 +154,7 @@ jobs:
       - name: Upload artifacts (raw)
         uses: actions/upload-artifact@v4
         with:
-          name: shashki-royale-v1.4.5-apk
+          name: shashki-royale-v1.4.6-apk
           path: release/
           retention-days: 90
 
@@ -166,9 +166,9 @@ jobs:
           cp android/build.gradle android-webview-wrapper/project-build.gradle
           cp android/gradle.properties android-webview-wrapper/
           cp android/settings.gradle android-webview-wrapper/
-          zip -r release/shashki-royale-v1.4.5-final-release.zip \
-            release/shashki-royale-v1.4.5-release.apk \
-            release/shashki-royale-v1.4.5-debug.apk \
+          zip -r release/shashki-royale-v1.4.6-final-release.zip \
+            release/shashki-royale-v1.4.6-release.apk \
+            release/shashki-royale-v1.4.6-debug.apk \
             release/APK_VERIFICATION.txt \
             release/APK_CONTENTS.txt \
             release/build-info.json \
@@ -177,14 +177,14 @@ jobs:
             -x "release/*.zip"
           ls -la release/
 
-      - name: Create GitHub Release v1.4.5
+      - name: Create GitHub Release v1.4.6
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.4.5
-          name: Шашки Рояль v1.4.5 — production release APK
+          tag_name: v1.4.6
+          name: Шашки Рояль v1.4.6 — production release APK
           body: |
-            ## Release v1.4.5 — client UX fixes (mobile)
+            ## Release v1.4.6 — client UX fixes (mobile)
 
             **Что исправлено:**
             - 🛡 **Баг #1 — баннер «Взятие обязательно!» на ходе соперника.**
@@ -203,22 +203,26 @@ jobs:
               `overscroll-behavior: contain`, sticky CTA с
               `padding-bottom: env(safe-area-inset-bottom)`. На 360×640
               CTA всегда виден / достижим.
+            - 🟢 **v1.4.6 critical fix:** `LocalGame.tsx` тоже получил тот же
+              компактный золотой хинт. В v1.4.5 правка была применена только
+              к онлайн-режиму, поэтому в локальной игре красный баннер
+              оставался. Теперь оба режима — единое поведение.
             - 🔒 **Защита от двойного settlement.** Добавлен
               `finishGameInFlightRef`, гарантирующий, что
               `processGameResult` RPC вызывается не более одного раза за
               партию (RPC и сам идемпотентен на стороне БД).
 
             **Что внутри:**
-            - `shashki-royale-v1.4.5-release.apk` — production-signed, debuggable=false
-            - `shashki-royale-v1.4.5-debug.apk` — для диагностики, applicationId с суффиксом `.debug`
-            - `shashki-royale-v1.4.5-final-release.zip` — полный архив с верификацией и handoff
+            - `shashki-royale-v1.4.6-release.apk` — production-signed, debuggable=false
+            - `shashki-royale-v1.4.6-debug.apk` — для диагностики, applicationId с суффиксом `.debug`
+            - `shashki-royale-v1.4.6-final-release.zip` — полный архив с верификацией и handoff
 
             **Параметры APK:**
             - packageId: `com.shashkiroyale.app`
-            - versionName: `1.4.5` / versionCode: `145`
+            - versionName: `1.4.6` / versionCode: `146`
             - minSdk 21, targetSdk 34
             - Native Android WebView (NOT TWA)
-            - Загружает https://shashki-royale.pages.dev/?apk=145
+            - Загружает https://shashki-royale.pages.dev/?apk=146
             - Включены: JavaScript, DOM storage, localStorage, cookies, third-party cookies
             - Offline-экран на русском с кнопкой «Повторить»
             - Edge-to-edge, status/nav bar #1A0800, portrait
@@ -227,9 +231,9 @@ jobs:
 
             Coin — внутренняя игровая валюта без денежной стоимости.
           files: |
-            release/shashki-royale-v1.4.5-release.apk
-            release/shashki-royale-v1.4.5-debug.apk
-            release/shashki-royale-v1.4.5-final-release.zip
+            release/shashki-royale-v1.4.6-release.apk
+            release/shashki-royale-v1.4.6-debug.apk
+            release/shashki-royale-v1.4.6-final-release.zip
             release/APK_VERIFICATION.txt
             release/APK_CONTENTS.txt
             release/build-info.json
