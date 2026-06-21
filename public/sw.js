@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1.4.8';
+const CACHE_VERSION = 'v1.4.9-cleanup';
 const CACHE_NAME = `shashki-royale-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
@@ -22,16 +22,24 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((cacheNames) =>
-        Promise.all(
-          cacheNames.map((cacheName) => {
-            if (cacheName !== CACHE_NAME) return caches.delete(cacheName);
-          }),
-        ),
-      )
-      .then(() => self.clients.claim()),
+    (async () => {
+      // 1) Drop ALL old caches (anything that isn't current CACHE_NAME)
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames.map((name) => (name !== CACHE_NAME ? caches.delete(name) : null)),
+      );
+      // 2) Take control of every open tab immediately
+      await self.clients.claim();
+      // 3) Tell every open client to reload itself so it picks up the fresh bundle
+      const all = await self.clients.matchAll({ type: 'window' });
+      for (const client of all) {
+        try {
+          client.navigate(client.url);
+        } catch {
+          /* ignore */
+        }
+      }
+    })(),
   );
 });
 
