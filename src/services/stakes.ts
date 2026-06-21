@@ -34,41 +34,31 @@ export type WalletTransaction = {
 /**
  * Получить кошелёк пользователя.
  *
- * SECURITY: дополнительно фильтруем по profile.player_id чтобы НИКОГДА не
- * вернуть чужой wallet, даже если setPlayerContext() молча упал.
+ * v1.4.9: используем SECURITY DEFINER RPC `get_or_create_profile` вместо
+ * прямого SELECT через RLS. Это устраняет race-condition: PostgREST может
+ * маршрутизировать `set_player_context` и последующий SELECT на разные
+ * соединения в pool, из-за чего `current_setting('app.current_player_id')`
+ * = NULL на стороне SELECT, и RLS политика блокирует чтение → wallet
+ * возвращается null → UI показывает баланс 0.
+ *
+ * RPC `get_or_create_profile` SECURITY DEFINER возвращает {profile, wallet}
+ * атомарно и обходит RLS (имеет собственную проверку p_player_id).
  */
 export async function getWallet(playerId: string): Promise<Wallet | null> {
   if (!supabase) return null;
 
   try {
-    await setPlayerContext(playerId);
-
-    // 1) Найти свой profile.id строго по player_id
-    const { data: profileRow, error: profileErr } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("player_id", playerId)
-      .maybeSingle();
-
-    if (profileErr) {
-      console.error("[getWallet] profile lookup error:", profileErr.message);
-      return null;
-    }
-    if (!profileRow) return null; // профиль ещё не создан — wallet тоже нет
-
-    // 2) Кошелёк только для этого profile_id
-    const { data, error } = await supabase
-      .from("wallets")
-      .select("*")
-      .eq("profile_id", profileRow.id)
-      .maybeSingle();
+    const { data, error } = await supabase.rpc("get_or_create_profile", {
+      p_player_id: playerId,
+    });
 
     if (error) {
-      console.error("[getWallet] Error:", error.message);
+      console.error("[getWallet] RPC error:", error.message);
       return null;
     }
 
-    return (data as Wallet) ?? null;
+    const wallet = (data as { wallet?: Wallet } | null)?.wallet ?? null;
+    return wallet;
   } catch (err) {
     console.error("[getWallet] Error:", err);
     return null;

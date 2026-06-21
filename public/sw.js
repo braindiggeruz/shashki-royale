@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1.4.9-cleanup';
+const CACHE_VERSION = 'v1.4.9-wallet-rpc';
 const CACHE_NAME = `shashki-royale-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
