@@ -44,9 +44,10 @@ type BoardProps = {
 };
 
 const ANIM_DURATION_MS = 350;
-// Board colors — wood-like (matching video reference)
-const DARK_SQ = "#6D4C41";
-const LIGHT_SQ = "#D7CCC8";
+// Board colors — classic light wooden palette (Lichess-style)
+// Per client request: "светлее, как в обычных шашках"
+const DARK_SQ = "#B58863";   // warm light-brown
+const LIGHT_SQ = "#F0D9B5";  // creamy beige
 
 // Green highlight colors (from video reference)
 const SELECTED_BG = "#2E7D32";

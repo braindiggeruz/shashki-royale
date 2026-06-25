@@ -4,7 +4,7 @@
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
-    "url": "https://shashki-royale.pages.dev/?apk=142",
+    "url": "https://shashki-royale.pages.dev/?apk=143",
     "androidScheme": "https",
     "cleartext": false,
     "allowNavigation": ["shashki-royale.pages.dev", "*.pages.dev", "*.supabase.co"]
