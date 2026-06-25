@@ -1,0 +1,76 @@
+name: build-apk
+on:
+  push:
+    branches: [main, "fix/**", "feat/**"]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Also build signed release APK (requires ANDROID_KEYSTORE_* secrets)"
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest          # x86_64 host — AAPT2 happy here
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with: { node-version: "22", cache: "pnpm" }
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with: { version: 10 }
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17", cache: gradle }
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install deps
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Vite build (skip tsc — same as production pipeline)
+        run: pnpm exec vite build
+
+      - name: Capacitor sync
+        run: npx cap sync android
+
+      - name: Gradle assemble debug
+        working-directory: android
+        run: |
+          if [ -f gradlew ]; then chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+          else gradle assembleDebug --no-daemon
+          fi
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: shashki-royale-debug-${{ github.sha }}
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Gradle assemble release
+        if: ${{ inputs.release == true }}
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_B64" | base64 -d > app/release.keystore
+          if [ -f gradlew ]; then chmod +x gradlew && ./gradlew assembleRelease --no-daemon
+          else gradle assembleRelease --no-daemon
+          fi
+
+      - name: Upload release APK
+        if: ${{ inputs.release == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: shashki-royale-release-${{ github.sha }}
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
